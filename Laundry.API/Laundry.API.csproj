@@ -24,13 +24,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Common\Exceptions\" />
     <Folder Include="Common\Helpers\" />
     <Folder Include="Common\Constants\" />
     <Folder Include="Models\" />
     <Folder Include="Interfaces\" />
-    <Folder Include="Middleware\" />
-    <Folder Include="Repositories\" />
   </ItemGroup>
 
 </Project>

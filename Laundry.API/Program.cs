@@ -1,5 +1,7 @@
 using System.Text;
 using Laundry.API.Data;
+using Laundry.API.Middleware;
+using Laundry.API.Repositories;
 using Laundry.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +40,10 @@ builder.Services.AddDbContext<LaundryDbContext>(options =>
 
 builder.Services.AddScoped<IJwtService, JwtService>();
 
+builder.Services.AddScoped<IBranchRepository, BranchRepository>();
+
+builder.Services.AddScoped<IBranchService, BranchService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -45,6 +51,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseHttpsRedirection();
 
