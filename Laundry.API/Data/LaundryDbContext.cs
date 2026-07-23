@@ -11,4 +11,5 @@ public class LaundryDbContext : DbContext
     }
 
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Branch> Branches => Set<Branch>();
 }
