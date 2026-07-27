@@ -10,6 +10,8 @@ public interface IBranchRepository
 
     Task<Branch?> GetByCodeAsync(string branchCode);
 
+    Task<bool> ExistsAsync(int id);
+
     Task AddAsync(Branch branch);
 
     Task UpdateAsync(Branch branch);

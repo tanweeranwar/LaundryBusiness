@@ -22,6 +22,11 @@ public interface IBranchPricingRepository
 
     Task AddAsync(BranchPricing pricing);
 
+    Task<BranchPricing?> GetPricingAsync(
+    int branchId,
+    int serviceCategoryId,
+    int garmentTypeId);
+
     void Update(BranchPricing pricing);
 
     void Delete(BranchPricing pricing);

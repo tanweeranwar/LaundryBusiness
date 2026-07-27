@@ -22,16 +22,23 @@ public class LaundryDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime) ||
+                    property.ClrType == typeof(DateTime?))
+                {
+                    property.SetColumnType("timestamp without time zone");
+                }
+            }
+        }
+
         ConfigureBranch(modelBuilder);
-
         ConfigureServiceCategory(modelBuilder);
-
         ConfigureGarmentType(modelBuilder);
-
         ConfigureBranchPricing(modelBuilder);
-
         ConfigureOrder(modelBuilder);
-
         ConfigureOrderItem(modelBuilder);
     }
 

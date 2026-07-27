@@ -53,4 +53,10 @@ public class BranchRepository : IBranchRepository
     {
         await _context.SaveChangesAsync();
     }
+
+    public async Task<bool> ExistsAsync(int id)
+    {
+        return await _context.Branches
+            .AnyAsync(x => x.Id == id);
+    }
 }

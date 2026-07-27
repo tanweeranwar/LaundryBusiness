@@ -95,5 +95,18 @@ namespace Laundry.API.Repositories
         {
             await _context.SaveChangesAsync();
         }
+
+        public async Task<BranchPricing?> GetPricingAsync(
+            int branchId,
+            int serviceCategoryId,
+            int garmentTypeId)
+        {
+            return await _context.BranchPricings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.BranchId == branchId &&
+                    x.ServiceCategoryId == serviceCategoryId &&
+                    x.GarmentTypeId == garmentTypeId);
+        }
     }
 }

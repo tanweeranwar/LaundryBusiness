@@ -50,6 +50,20 @@ builder.Services.AddScoped<IBranchPricingRepository, BranchPricingRepository>();
 
 builder.Services.AddScoped<IBranchPricingService, BranchPricingService>();
 
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+
+builder.Services.AddScoped<IPricingService, PricingService>();
+
+builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
+
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+
+builder.Services.AddScoped<IOrderService, OrderService>();
+
+builder.Services.AddScoped<IGarmentTypeRepository, GarmentTypeRepository>();
+
+builder.Services.AddScoped<IGarmentTypeService, GarmentTypeService>();
+
 
 var app = builder.Build();
 

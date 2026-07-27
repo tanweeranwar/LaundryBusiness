@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laundry.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class BranchPricingController : ControllerBase
 {
     private readonly IBranchPricingService _service;
@@ -18,14 +18,13 @@ public class BranchPricingController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<ActionResult<IEnumerable<BranchPricingDto>>> GetAll()
     {
-        var result = await _service.GetAllAsync();
-        return Ok(result);
+        return Ok(await _service.GetAllAsync());
     }
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id)
+    public async Task<ActionResult<BranchPricingDto>> GetById(int id)
     {
         var result = await _service.GetByIdAsync(id);
 
@@ -36,29 +35,27 @@ public class BranchPricingController : ControllerBase
     }
 
     [HttpGet("branch/{branchId:int}")]
-    public async Task<IActionResult> GetByBranch(int branchId)
+    public async Task<ActionResult<IEnumerable<BranchPricingDto>>> GetByBranch(int branchId)
     {
-        var result = await _service.GetByBranchAsync(branchId);
-        return Ok(result);
+        return Ok(await _service.GetByBranchAsync(branchId));
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateBranchPricingDto dto)
+    public async Task<ActionResult<BranchPricingDto>> Create(CreateBranchPricingDto request)
     {
-        var result = await _service.CreateAsync(dto);
+        var result = await _service.CreateAsync(request);
 
-        return CreatedAtAction(
-            nameof(GetById),
+        return CreatedAtAction(nameof(GetById),
             new { id = result.Id },
             result);
     }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(
+    public async Task<ActionResult<BranchPricingDto>> Update(
         int id,
-        UpdateBranchPricingDto dto)
+        UpdateBranchPricingDto request)
     {
-        var result = await _service.UpdateAsync(id, dto);
+        var result = await _service.UpdateAsync(id, request);
 
         return Ok(result);
     }
