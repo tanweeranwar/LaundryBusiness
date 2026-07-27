@@ -1,5 +1,6 @@
 using System.Text;
 using Laundry.API.Data;
+using Laundry.API.Interfaces;
 using Laundry.API.Middleware;
 using Laundry.API.Repositories;
 using Laundry.API.Services;
@@ -33,6 +34,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<LaundryDbContext>(options =>
@@ -43,6 +45,11 @@ builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IBranchRepository, BranchRepository>();
 
 builder.Services.AddScoped<IBranchService, BranchService>();
+
+builder.Services.AddScoped<IBranchPricingRepository, BranchPricingRepository>();
+
+builder.Services.AddScoped<IBranchPricingService, BranchPricingService>();
+
 
 var app = builder.Build();
 

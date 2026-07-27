@@ -3,6 +3,7 @@ using System;
 using Laundry.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laundry.API.Migrations
 {
     [DbContext(typeof(LaundryDbContext))]
-    partial class LaundryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260727061908_AddBranchPricing")]
+    partial class AddBranchPricing
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -124,7 +127,6 @@ namespace Laundry.API.Migrations
                         .HasColumnType("integer");
 
                     b.Property<decimal?>("ExpressPrice")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(10,2)");
 
                     b.Property<int>("GarmentTypeId")
@@ -140,7 +142,6 @@ namespace Laundry.API.Migrations
                         .HasColumnType("text");
 
                     b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(10,2)");
 
                     b.Property<int>("ServiceCategoryId")
@@ -241,142 +242,6 @@ namespace Laundry.API.Migrations
                     b.ToTable("GarmentTypes");
                 });
 
-            modelBuilder.Entity("Laundry.API.Entities.Order", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BranchId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("DiscountAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateTime>("ExpectedDeliveryDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("GrandTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("OrderDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("OrderNumber")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<int>("PaymentMethod")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PaymentStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Remarks")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Subtotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("TaxAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateTime?>("UpdatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BranchId");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("OrderDate");
-
-                    b.HasIndex("OrderNumber")
-                        .IsUnique();
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("Orders");
-                });
-
-            modelBuilder.Entity("Laundry.API.Entities.OrderItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("ExpressService")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal?>("ExpressUnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<int>("GarmentTypeId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal>("LineTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<int>("OrderId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Quantity")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ServiceCategoryId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateTime?>("UpdatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GarmentTypeId");
-
-                    b.HasIndex("ServiceCategoryId");
-
-                    b.HasIndex("OrderId", "GarmentTypeId");
-
-                    b.ToTable("OrderItems");
-                });
-
             modelBuilder.Entity("Laundry.API.Entities.ServiceCategory", b =>
                 {
                     b.Property<int>("Id")
@@ -441,57 +306,6 @@ namespace Laundry.API.Migrations
                     b.Navigation("GarmentType");
 
                     b.Navigation("ServiceCategory");
-                });
-
-            modelBuilder.Entity("Laundry.API.Entities.Order", b =>
-                {
-                    b.HasOne("Laundry.API.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Laundry.API.Entities.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Branch");
-
-                    b.Navigation("Customer");
-                });
-
-            modelBuilder.Entity("Laundry.API.Entities.OrderItem", b =>
-                {
-                    b.HasOne("Laundry.API.Entities.GarmentType", "GarmentType")
-                        .WithMany()
-                        .HasForeignKey("GarmentTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Laundry.API.Entities.Order", "Order")
-                        .WithMany("Items")
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Laundry.API.Entities.ServiceCategory", "ServiceCategory")
-                        .WithMany()
-                        .HasForeignKey("ServiceCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("GarmentType");
-
-                    b.Navigation("Order");
-
-                    b.Navigation("ServiceCategory");
-                });
-
-            modelBuilder.Entity("Laundry.API.Entities.Order", b =>
-                {
-                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

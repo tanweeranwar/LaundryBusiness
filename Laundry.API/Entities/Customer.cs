@@ -1,6 +1,6 @@
 ﻿namespace Laundry.API.Entities;
 
-public class Customer
+public class Customer : BaseEntity
 {
     public Guid Id { get; set; }
 
@@ -15,10 +15,4 @@ public class Customer
     public string PasswordHash { get; set; } = string.Empty;
 
     public string Role { get; set; } = "Customer";
-
-    public bool IsActive { get; set; } = true;
-
-    public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
-
-    public DateTime? UpdatedOn { get; set; }
 }

@@ -1,6 +1,6 @@
 ﻿namespace Laundry.API.Entities;
 
-public class Branch
+public class Branch : BaseEntity
 {
     public int Id { get; set; }
 
@@ -35,10 +35,4 @@ public class Branch
     public TimeOnly ClosingTime { get; set; }
 
     public decimal PickupRadiusKm { get; set; }
-
-    public bool IsActive { get; set; } = true;
-
-    public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
-
-    public DateTime? UpdatedOn { get; set; }
 }
