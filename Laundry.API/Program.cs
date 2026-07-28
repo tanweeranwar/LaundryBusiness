@@ -3,7 +3,9 @@ using Laundry.API.Data;
 using Laundry.API.Interfaces;
 using Laundry.API.Middleware;
 using Laundry.API.Repositories;
+using Laundry.API.Repositories.Interfaces;
 using Laundry.API.Services;
+using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -43,27 +45,26 @@ builder.Services.AddDbContext<LaundryDbContext>(options =>
 builder.Services.AddScoped<IJwtService, JwtService>();
 
 builder.Services.AddScoped<IBranchRepository, BranchRepository>();
-
 builder.Services.AddScoped<IBranchService, BranchService>();
 
 builder.Services.AddScoped<IBranchPricingRepository, BranchPricingRepository>();
-
 builder.Services.AddScoped<IBranchPricingService, BranchPricingService>();
 
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+
+builder.Services.AddScoped<IGarmentTypeRepository, GarmentTypeRepository>();
+builder.Services.AddScoped<IGarmentTypeService, GarmentTypeService>();
+
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 builder.Services.AddScoped<IPricingService, PricingService>();
 
 builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
-
-builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
-
-builder.Services.AddScoped<IOrderService, OrderService>();
-
-builder.Services.AddScoped<IGarmentTypeRepository, GarmentTypeRepository>();
-
-builder.Services.AddScoped<IGarmentTypeService, GarmentTypeService>();
-
+builder.Services.AddScoped<IPaymentNumberGenerator, PaymentNumberGenerator>();
 
 var app = builder.Build();
 

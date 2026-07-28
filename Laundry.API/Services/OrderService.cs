@@ -52,14 +52,14 @@ public class OrderService : IOrderService
 
             Status = OrderStatus.Created,
 
-            PaymentStatus = PaymentStatus.Pending,
+            PaymentStatus = OrderPaymentStatus.Pending,
 
-            PaymentMethod = (PaymentMethod)request.PaymentMethod,
 
             Subtotal = pricing.Subtotal,
             DiscountAmount = pricing.Discount,
             TaxAmount = pricing.Tax,
             GrandTotal = pricing.GrandTotal,
+            BalanceAmount = pricing.GrandTotal,
 
             Remarks = request.Remarks
         };
@@ -148,7 +148,7 @@ public class OrderService : IOrderService
             TaxAmount = order.TaxAmount,
             GrandTotal = order.GrandTotal,
             PaymentStatus = (int)order.PaymentStatus,
-            PaymentMethod = (int)order.PaymentMethod,
+            BalanceAmount = order.BalanceAmount,
             Remarks = order.Remarks,
 
             Items = order.Items.Select(i => new OrderItemDto
@@ -286,7 +286,7 @@ public class OrderService : IOrderService
         order.Status = newStatus;
         order.Remarks = request.Remarks;
 
-        await _orderRepository.UpdateAsync(order);
+        _orderRepository.Update(order);
 
         await _orderRepository.SaveChangesAsync();
 

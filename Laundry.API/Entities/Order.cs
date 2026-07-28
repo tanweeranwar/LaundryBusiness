@@ -25,10 +25,13 @@ public class Order : BaseEntity
     public decimal TaxAmount { get; set; }
 
     public decimal GrandTotal { get; set; }
+    public decimal BalanceAmount { get; set; }
+    //public PaymentStatus PaymentStatus { get; set; }
+    public decimal TotalPaid => GrandTotal - BalanceAmount;
+    public OrderPaymentStatus PaymentStatus { get; set; }
 
-    public PaymentStatus PaymentStatus { get; set; }
-
-    public PaymentMethod PaymentMethod { get; set; }
+    public ICollection<Payment> Payments { get; set; }
+        = new List<Payment>();
 
     public string? Remarks { get; set; }
 

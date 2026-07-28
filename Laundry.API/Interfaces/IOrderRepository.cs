@@ -21,7 +21,7 @@ public interface IOrderRepository
 
     Task<Order?> GetTrackedByIdAsync(int id);
 
-    Task UpdateAsync(Order order);
+    void Update(Order order);
 
     Task<bool> ExistsAsync(int id);
 

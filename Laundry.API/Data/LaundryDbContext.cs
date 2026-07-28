@@ -1,4 +1,5 @@
-﻿using Laundry.API.Entities;
+﻿using Laundry.API.Configurations;
+using Laundry.API.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Laundry.API.Data;
@@ -17,6 +18,7 @@ public class LaundryDbContext : DbContext
     public DbSet<BranchPricing> BranchPricings => Set<BranchPricing>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +42,8 @@ public class LaundryDbContext : DbContext
         ConfigureBranchPricing(modelBuilder);
         ConfigureOrder(modelBuilder);
         ConfigureOrderItem(modelBuilder);
+
+        modelBuilder.ApplyConfiguration(new PaymentConfiguration());
     }
 
     #region Configuration Methods
@@ -123,6 +127,10 @@ public class LaundryDbContext : DbContext
             entity.Property(x => x.GrandTotal)
                   .HasPrecision(18, 2);
 
+            // NEW
+            entity.Property(x => x.BalanceAmount)
+                  .HasPrecision(18, 2);
+
             entity.HasIndex(x => x.OrderNumber)
                   .IsUnique();
 
@@ -143,6 +151,12 @@ public class LaundryDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(x => x.CustomerId)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            // NEW
+            entity.HasMany(x => x.Payments)
+                  .WithOne(x => x.Order)
+                  .HasForeignKey(x => x.OrderId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

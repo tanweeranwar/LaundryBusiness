@@ -79,13 +79,13 @@ public class OrderRepository : IOrderRepository
     {
         return await _context.Orders
             .Include(o => o.Items)
+            .Include(o => o.Payments)
             .FirstOrDefaultAsync(o => o.Id == id);
     }
 
-    public async Task UpdateAsync(Order order)
+    public void Update(Order order)
     {
         _context.Orders.Update(order);
-        await Task.CompletedTask;
     }
 
     public async Task<bool> ExistsAsync(int id)
