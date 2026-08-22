@@ -81,6 +81,14 @@ builder.Services.AddScoped<IPickupService, PickupService>();
 builder.Services.AddScoped<IDeliveryRepository, DeliveryRepository>();
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 
+builder.Services.AddScoped<
+    IOrderStatusHistoryRepository,
+    OrderStatusHistoryRepository>();
+
+builder.Services.AddScoped<
+    IOrderStatusHistoryService,
+    OrderStatusHistoryService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

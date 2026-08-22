@@ -17,6 +17,7 @@ public class LaundryDbContext : DbContext
     public DbSet<GarmentType> GarmentTypes => Set<GarmentType>();
     public DbSet<BranchPricing> BranchPricings => Set<BranchPricing>();
     public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Pickup> Pickups => Set<Pickup>();
@@ -43,6 +44,7 @@ public class LaundryDbContext : DbContext
         ConfigureGarmentType(modelBuilder);
         ConfigureBranchPricing(modelBuilder);
         ConfigureOrder(modelBuilder);
+        ConfigureOrderStatusHistory(modelBuilder);
         ConfigureOrderItem(modelBuilder);
         ConfigurePickup(modelBuilder);
         ConfigureDelivery(modelBuilder);
@@ -149,6 +151,28 @@ public class LaundryDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.CustomerId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureOrderStatusHistory(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OrderStatusHistory>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Remarks)
+                .HasMaxLength(500);
+
+            entity.Property(x => x.ChangedBy)
+                .HasMaxLength(100);
+
+            entity.HasOne(x => x.Order)
+                .WithMany()
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.OrderId);
+            entity.HasIndex(x => x.ChangedOn);
         });
     }
 

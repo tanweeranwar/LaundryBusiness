@@ -5,6 +5,7 @@ using Laundry.API.Exceptions;
 using Laundry.API.Interfaces;
 using Laundry.API.Models.Pricing;
 using Laundry.API.Repositories;
+using Laundry.API.Repositories.Interfaces;
 
 namespace Laundry.API.Services;
 
@@ -15,19 +16,22 @@ public class OrderService : IOrderService
     private readonly IBranchRepository _branchRepository;
     private readonly IPricingService _pricingService;
     private readonly IOrderNumberGenerator _orderNumberGenerator;
+    private readonly IOrderStatusHistoryRepository _orderStatusHistoryRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
         ICustomerRepository customerRepository,
         IBranchRepository branchRepository,
         IPricingService pricingService,
-        IOrderNumberGenerator orderNumberGenerator)
+        IOrderNumberGenerator orderNumberGenerator,
+        IOrderStatusHistoryRepository orderStatusHistoryRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _branchRepository = branchRepository;
         _pricingService = pricingService;
         _orderNumberGenerator = orderNumberGenerator;
+        _orderStatusHistoryRepository = orderStatusHistoryRepository;
     }
 
     public async Task<OrderDto> CreateAsync(CreateOrderDto request)
@@ -178,8 +182,11 @@ public class OrderService : IOrderService
             return false;
 
         var newStatus = (OrderStatus)request.Status;
+        var previousStatus = order.Status;
 
-        if (order.Status == newStatus &&
+        // No actual status change.
+        // Allow remarks-only update without creating history.
+        if (previousStatus == newStatus &&
             string.Equals(
                 order.Remarks,
                 request.Remarks,
@@ -188,13 +195,29 @@ public class OrderService : IOrderService
             return true;
         }
 
-        ValidateStatusTransition(order.Status, newStatus);
+        ValidateStatusTransition(previousStatus, newStatus);
 
         order.Status = newStatus;
         order.Remarks = request.Remarks;
         order.UpdatedOn = DateTime.UtcNow;
 
         _orderRepository.Update(order);
+
+        // Record status transition only when the status actually changes.
+        if (previousStatus != newStatus)
+        {
+            var history = new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                FromStatus = previousStatus,
+                ToStatus = newStatus,
+                Remarks = request.Remarks,
+                ChangedBy = null,
+                ChangedOn = DateTime.Now
+            };
+
+            await _orderStatusHistoryRepository.AddAsync(history);
+        }
 
         await _orderRepository.SaveChangesAsync();
 

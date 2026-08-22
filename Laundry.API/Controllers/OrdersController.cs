@@ -1,7 +1,9 @@
 ﻿//using Laundry.API.DTOs.Order;
+using Laundry.API.DTOs.Order;
 using Laundry.API.DTOs.Orders;
 using Laundry.API.Interfaces;
 using Laundry.API.Services;
+using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,10 +15,14 @@ namespace Laundry.API.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
+    private readonly IOrderStatusHistoryService _orderStatusHistoryService;
 
-    public OrdersController(IOrderService orderService)
+    public OrdersController(
+    IOrderService orderService,
+    IOrderStatusHistoryService orderStatusHistoryService)
     {
         _orderService = orderService;
+        _orderStatusHistoryService = orderStatusHistoryService;
     }
 
     /// <summary>
@@ -107,5 +113,27 @@ public class OrdersController : ControllerBase
             return NotFound();
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Gets the status history of an order.
+    /// </summary>
+    [HttpGet("{id:int}/status-history")]
+    [ProducesResponseType(
+        typeof(IEnumerable<OrderStatusHistoryDto>),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IEnumerable<OrderStatusHistoryDto>>>
+        GetStatusHistory(int id)
+    {
+        var order = await _orderService.GetByIdAsync(id);
+
+        if (order == null)
+            return NotFound();
+
+        var history =
+            await _orderStatusHistoryService.GetByOrderIdAsync(id);
+
+        return Ok(history);
     }
 }
