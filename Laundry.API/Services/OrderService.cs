@@ -1,10 +1,10 @@
 ﻿using Laundry.API.DTOs.Orders;
 using Laundry.API.Entities;
 using Laundry.API.Enums;
+using Laundry.API.Exceptions;
 using Laundry.API.Interfaces;
 using Laundry.API.Models.Pricing;
 using Laundry.API.Repositories;
-using Laundry.API.Exceptions;
 
 namespace Laundry.API.Services;
 
@@ -111,8 +111,8 @@ public class OrderService : IOrderService
                 "Order number is required.",
                 nameof(orderNumber));
 
-        var order = await _orderRepository
-            .GetByOrderNumberAsync(orderNumber.Trim());
+        var order =
+            await _orderRepository.GetByOrderNumberAsync(orderNumber.Trim());
 
         if (order == null)
             return null;

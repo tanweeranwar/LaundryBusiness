@@ -9,6 +9,8 @@ public interface IDeliveryRepository
 
     Task<Delivery?> GetByIdAsync(int id);
 
+    Task<Delivery?> GetTrackedByIdAsync(int id);
+
     Task<Delivery?> GetByOrderIdAsync(int orderId);
 
     Task<List<Delivery>> GetByStatusAsync(DeliveryStatus status);

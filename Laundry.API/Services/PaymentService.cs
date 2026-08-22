@@ -25,16 +25,20 @@ public class PaymentService : IPaymentService
 
     public async Task<PaymentDto> CreateAsync(CreatePaymentDto request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var order = await _orderRepository.GetTrackedByIdAsync(request.OrderId);
 
         if (order == null)
-            throw new Exception("Order not found.");
+            throw new InvalidOperationException("Order not found.");
 
         if (request.Amount <= 0)
-            throw new Exception("Payment amount must be greater than zero.");
+            throw new InvalidOperationException(
+                "Payment amount must be greater than zero.");
 
         if (request.Amount > order.BalanceAmount)
-            throw new Exception("Payment amount cannot exceed the balance amount.");
+            throw new InvalidOperationException(
+                "Payment amount cannot exceed the balance amount.");
 
         var payment = new Payment
         {
@@ -51,18 +55,12 @@ public class PaymentService : IPaymentService
 
         await _paymentRepository.AddAsync(payment);
 
-        var totalPaid = await _paymentRepository.GetTotalPaidAsync(order.Id);
+        var totalPaid =
+            await _paymentRepository.GetTotalPaidAsync(order.Id);
 
         totalPaid += payment.Amount;
 
-        order.BalanceAmount = Math.Max(0, order.GrandTotal - totalPaid);
-
-        if (order.BalanceAmount == 0)
-            order.PaymentStatus = OrderPaymentStatus.Paid;
-        else if (totalPaid > 0)
-            order.PaymentStatus = OrderPaymentStatus.PartiallyPaid;
-        else
-            order.PaymentStatus = OrderPaymentStatus.Pending;
+        UpdateOrderPaymentStatus(order, totalPaid);
 
         _orderRepository.Update(order);
 
@@ -70,6 +68,7 @@ public class PaymentService : IPaymentService
 
         return Map(payment);
     }
+
     public async Task<PaymentDto?> GetByIdAsync(int id)
     {
         var payment = await _paymentRepository.GetByIdAsync(id);
@@ -79,36 +78,39 @@ public class PaymentService : IPaymentService
 
     public async Task<IEnumerable<PaymentDto>> GetByOrderIdAsync(int orderId)
     {
-        var payments = await _paymentRepository.GetByOrderIdAsync(orderId);
+        var payments =
+            await _paymentRepository.GetByOrderIdAsync(orderId);
 
         return payments.Select(Map).ToList();
     }
 
-    public async Task<PaymentDto> UpdateAsync(int id, UpdatePaymentDto request)
+    public async Task<PaymentDto> UpdateAsync(
+        int id,
+        UpdatePaymentDto request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var payment = await _paymentRepository.GetByIdAsync(id);
 
         if (payment == null)
-            throw new Exception("Payment not found.");
+            throw new InvalidOperationException("Payment not found.");
 
-        payment.PaymentStatus = (PaymentStatus)request.PaymentStatus;
+        payment.PaymentStatus =
+            (PaymentStatus)request.PaymentStatus;
+
         payment.Remarks = request.Remarks;
 
         _paymentRepository.Update(payment);
 
-        var order = await _orderRepository.GetTrackedByIdAsync(payment.OrderId);
+        var order =
+            await _orderRepository.GetTrackedByIdAsync(payment.OrderId);
 
         if (order != null)
         {
-            var totalPaid = await _paymentRepository.GetTotalPaidAsync(order.Id);
+            var totalPaid =
+                await _paymentRepository.GetTotalPaidAsync(order.Id);
 
-            order.BalanceAmount = Math.Max(0, order.GrandTotal - totalPaid);
-
-            order.PaymentStatus = order.BalanceAmount == 0
-                ? OrderPaymentStatus.Paid
-                : totalPaid > 0
-                    ? OrderPaymentStatus.PartiallyPaid
-                    : OrderPaymentStatus.Pending;
+            UpdateOrderPaymentStatus(order, totalPaid);
 
             _orderRepository.Update(order);
         }
@@ -117,6 +119,28 @@ public class PaymentService : IPaymentService
 
         return Map(payment);
     }
+
+    private static void UpdateOrderPaymentStatus(
+        Order order,
+        decimal totalPaid)
+    {
+        order.BalanceAmount =
+            Math.Max(0, order.GrandTotal - totalPaid);
+
+        if (order.BalanceAmount == 0)
+        {
+            order.PaymentStatus = OrderPaymentStatus.Paid;
+        }
+        else if (totalPaid > 0)
+        {
+            order.PaymentStatus = OrderPaymentStatus.PartiallyPaid;
+        }
+        else
+        {
+            order.PaymentStatus = OrderPaymentStatus.Pending;
+        }
+    }
+
     private static PaymentDto Map(Payment payment)
     {
         return new PaymentDto

@@ -29,6 +29,12 @@ public class DeliveryRepository : IDeliveryRepository
             .FirstOrDefaultAsync(x => x.Id == id);
     }
 
+    public async Task<Delivery?> GetTrackedByIdAsync(int id)
+    {
+        return await _context.Deliveries
+            .FirstOrDefaultAsync(x => x.Id == id);
+    }
+
     public async Task<Delivery?> GetByOrderIdAsync(int orderId)
     {
         return await _context.Deliveries
@@ -37,7 +43,8 @@ public class DeliveryRepository : IDeliveryRepository
             .FirstOrDefaultAsync(x => x.OrderId == orderId);
     }
 
-    public async Task<List<Delivery>> GetByStatusAsync(DeliveryStatus status)
+    public async Task<List<Delivery>> GetByStatusAsync(
+        DeliveryStatus status)
     {
         return await _context.Deliveries
             .AsNoTracking()
@@ -49,7 +56,7 @@ public class DeliveryRepository : IDeliveryRepository
 
     public async Task UpdateAsync(Delivery delivery)
     {
-        _context.Deliveries.Update(delivery);
+        _context.Entry(delivery).State = EntityState.Modified;
         await Task.CompletedTask;
     }
 

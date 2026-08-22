@@ -124,6 +124,13 @@ public class DeliveryService : IDeliveryService
 
         ValidateScheduledDate(request.ScheduledDate);
 
+        var order = await _orderRepository.GetTrackedByIdAsync(
+            delivery.OrderId);
+
+        if (order == null)
+            throw new InvalidOperationException(
+                $"Order '{delivery.OrderId}' does not exist.");
+
         delivery.Status = request.Status;
         delivery.ScheduledDate = NormalizeDate(request.ScheduledDate);
         delivery.AssignedTo = request.AssignedTo;
@@ -133,6 +140,9 @@ public class DeliveryService : IDeliveryService
         {
             delivery.DeliveredOn = NormalizeDate(
                 request.DeliveredOn ?? DateTime.Now);
+
+            order.Status = OrderStatus.Delivered;
+            order.UpdatedOn = DateTime.UtcNow;
         }
         else if (request.DeliveredOn.HasValue)
         {
@@ -143,6 +153,8 @@ public class DeliveryService : IDeliveryService
         delivery.UpdatedOn = DateTime.Now;
 
         await _deliveryRepository.UpdateAsync(delivery);
+        _orderRepository.Update(order);
+
         await _deliveryRepository.SaveChangesAsync();
 
         return Map(delivery);
