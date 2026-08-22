@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Laundry.API.Common.Exceptions;
 using Laundry.API.Common.Responses;
+using Laundry.API.Exceptions;
 
 namespace Laundry.API.Middleware;
 
@@ -25,31 +26,54 @@ public class ExceptionMiddleware
         }
         catch (DuplicateBranchCodeException ex)
         {
-            _logger.LogWarning(ex, ex.Message);
-
-            context.Response.StatusCode = StatusCodes.Status409Conflict;
-
-            context.Response.ContentType = "application/json";
-
-            var response = ApiResponse<string>.FailureResponse(ex.Message);
-
-            await context.Response.WriteAsync(
-                JsonSerializer.Serialize(response));
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status409Conflict,
+                ex);
+        }
+        catch (InvalidOrderStatusTransitionException ex)
+        {
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status400BadRequest,
+                ex);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, ex.Message);
 
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-
-            context.Response.ContentType = "application/json";
-
-            var response =
-                ApiResponse<string>.FailureResponse(
-                    "An unexpected error occurred.");
-
-            await context.Response.WriteAsync(
-                JsonSerializer.Serialize(response));
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status500InternalServerError,
+                "An unexpected error occurred.");
         }
+    }
+
+    private async Task WriteErrorResponse(
+        HttpContext context,
+        int statusCode,
+        Exception exception)
+    {
+        _logger.LogWarning(exception, exception.Message);
+
+        await WriteErrorResponse(
+            context,
+            statusCode,
+            exception.Message);
+    }
+
+    private static async Task WriteErrorResponse(
+        HttpContext context,
+        int statusCode,
+        string message)
+    {
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/json";
+
+        var response =
+            ApiResponse<string>.FailureResponse(message);
+
+        await context.Response.WriteAsync(
+            JsonSerializer.Serialize(response));
     }
 }

@@ -10,9 +10,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
-// JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -27,7 +28,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Jwt:Audience"],
 
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                Encoding.UTF8.GetBytes(
+                    builder.Configuration["Jwt:Key"]!))
         };
     });
 
@@ -36,35 +38,48 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
-
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<LaundryDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("LaundryDb")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("LaundryDb")));
 
+// Authentication
 builder.Services.AddScoped<IJwtService, JwtService>();
 
+// Branch
 builder.Services.AddScoped<IBranchRepository, BranchRepository>();
 builder.Services.AddScoped<IBranchService, BranchService>();
 
+// Branch Pricing
 builder.Services.AddScoped<IBranchPricingRepository, BranchPricingRepository>();
 builder.Services.AddScoped<IBranchPricingService, BranchPricingService>();
 
+// Customer
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 
+// Garment Type
 builder.Services.AddScoped<IGarmentTypeRepository, GarmentTypeRepository>();
 builder.Services.AddScoped<IGarmentTypeService, GarmentTypeService>();
 
+// Order
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IPricingService, PricingService>();
+builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
 
+// Payment
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
-
-builder.Services.AddScoped<IPricingService, PricingService>();
-
-builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
 builder.Services.AddScoped<IPaymentNumberGenerator, PaymentNumberGenerator>();
+
+// Pickup
+builder.Services.AddScoped<IPickupRepository, PickupRepository>();
+builder.Services.AddScoped<IPickupService, PickupService>();
+
+// Delivery
+builder.Services.AddScoped<IDeliveryRepository, DeliveryRepository>();
+builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 
 var app = builder.Build();
 

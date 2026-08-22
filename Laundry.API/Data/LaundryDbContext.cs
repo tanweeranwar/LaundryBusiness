@@ -19,6 +19,8 @@ public class LaundryDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Pickup> Pickups => Set<Pickup>();
+    public DbSet<Delivery> Deliveries => Set<Delivery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,11 +44,11 @@ public class LaundryDbContext : DbContext
         ConfigureBranchPricing(modelBuilder);
         ConfigureOrder(modelBuilder);
         ConfigureOrderItem(modelBuilder);
+        ConfigurePickup(modelBuilder);
+        ConfigureDelivery(modelBuilder);
 
         modelBuilder.ApplyConfiguration(new PaymentConfiguration());
     }
-
-    #region Configuration Methods
 
     private static void ConfigureBranch(ModelBuilder modelBuilder)
     {
@@ -76,25 +78,25 @@ public class LaundryDbContext : DbContext
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.Price)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.Property(x => x.ExpressPrice)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.HasOne(x => x.Branch)
-                  .WithMany()
-                  .HasForeignKey(x => x.BranchId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany()
+                .HasForeignKey(x => x.BranchId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(x => x.ServiceCategory)
-                  .WithMany()
-                  .HasForeignKey(x => x.ServiceCategoryId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany()
+                .HasForeignKey(x => x.ServiceCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(x => x.GarmentType)
-                  .WithMany()
-                  .HasForeignKey(x => x.GarmentTypeId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany()
+                .HasForeignKey(x => x.GarmentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(x => new
             {
@@ -112,51 +114,41 @@ public class LaundryDbContext : DbContext
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.OrderNumber)
-                  .IsRequired()
-                  .HasMaxLength(30);
+                .IsRequired()
+                .HasMaxLength(30);
 
             entity.Property(x => x.Subtotal)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.Property(x => x.DiscountAmount)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.Property(x => x.TaxAmount)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.Property(x => x.GrandTotal)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
-            // NEW
             entity.Property(x => x.BalanceAmount)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.HasIndex(x => x.OrderNumber)
-                  .IsUnique();
+                .IsUnique();
 
             entity.HasIndex(x => x.CustomerId);
-
             entity.HasIndex(x => x.BranchId);
-
             entity.HasIndex(x => x.OrderDate);
-
             entity.HasIndex(x => x.Status);
 
             entity.HasOne(x => x.Branch)
-                  .WithMany()
-                  .HasForeignKey(x => x.BranchId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany()
+                .HasForeignKey(x => x.BranchId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(x => x.Customer)
-                  .WithMany()
-                  .HasForeignKey(x => x.CustomerId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            // NEW
-            entity.HasMany(x => x.Payments)
-                  .WithOne(x => x.Order)
-                  .HasForeignKey(x => x.OrderId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                .WithMany()
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -167,13 +159,13 @@ public class LaundryDbContext : DbContext
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.UnitPrice)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.Property(x => x.ExpressUnitPrice)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.Property(x => x.LineTotal)
-                  .HasPrecision(18, 2);
+                .HasPrecision(18, 2);
 
             entity.HasIndex(x => new
             {
@@ -182,21 +174,69 @@ public class LaundryDbContext : DbContext
             });
 
             entity.HasOne(x => x.Order)
-                  .WithMany(x => x.Items)
-                  .HasForeignKey(x => x.OrderId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                .WithMany(x => x.Items)
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(x => x.ServiceCategory)
-                  .WithMany()
-                  .HasForeignKey(x => x.ServiceCategoryId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany()
+                .HasForeignKey(x => x.ServiceCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(x => x.GarmentType)
-                  .WithMany()
-                  .HasForeignKey(x => x.GarmentTypeId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany()
+                .HasForeignKey(x => x.GarmentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
-    #endregion
+    private static void ConfigurePickup(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Pickup>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.AssignedTo)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Remarks)
+                .HasMaxLength(500);
+
+            entity.HasOne(x => x.Order)
+                .WithMany()
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.OrderId)
+                .IsUnique();
+
+            entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => x.ScheduledDate);
+        });
+    }
+
+    private static void ConfigureDelivery(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Delivery>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.AssignedTo)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Remarks)
+                .HasMaxLength(500);
+
+            entity.HasOne(x => x.Order)
+                .WithMany()
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.OrderId)
+                .IsUnique();
+
+            entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => x.ScheduledDate);
+        });
+    }
 }

@@ -4,6 +4,7 @@ using Laundry.API.Enums;
 using Laundry.API.Interfaces;
 using Laundry.API.Models.Pricing;
 using Laundry.API.Repositories;
+using Laundry.API.Exceptions;
 
 namespace Laundry.API.Services;
 
@@ -46,6 +47,7 @@ public class OrderService : IOrderService
             BranchId = request.BranchId,
             CustomerId = request.CustomerId,
             OrderDate = DateTime.Now,
+
             ExpectedDeliveryDate = DateTime.SpecifyKind(
                 request.ExpectedDeliveryDate,
                 DateTimeKind.Local),
@@ -53,7 +55,6 @@ public class OrderService : IOrderService
             Status = OrderStatus.Created,
 
             PaymentStatus = OrderPaymentStatus.Pending,
-
 
             Subtotal = pricing.Subtotal,
             DiscountAmount = pricing.Discount,
@@ -79,13 +80,12 @@ public class OrderService : IOrderService
         }
 
         await _orderRepository.AddAsync(order);
-
         await _orderRepository.SaveChangesAsync();
 
-        Order? savedOrder =
+        var savedOrder =
             await _orderRepository.GetOrderWithItemsAsync(order.Id);
 
-        if (savedOrder is null)
+        if (savedOrder == null)
         {
             throw new InvalidOperationException(
                 "Order was created but could not be loaded.");
@@ -93,101 +93,6 @@ public class OrderService : IOrderService
 
         return MapToOrderDto(savedOrder);
     }
-    #region Private Validation Methods
-
-    private async Task ValidateCreateRequestAsync(CreateOrderDto request)
-    {
-        if (!await _branchRepository.ExistsAsync(request.BranchId))
-        {
-            throw new InvalidOperationException(
-                $"Branch '{request.BranchId}' does not exist.");
-        }
-
-        if (!await _customerRepository.ExistsAsync(request.CustomerId))
-        {
-            throw new InvalidOperationException(
-                $"Customer '{request.CustomerId}' does not exist.");
-        }
-
-        ValidateExpectedDeliveryDate(request.ExpectedDeliveryDate);
-
-        if (request.Items == null || !request.Items.Any())
-        {
-            throw new InvalidOperationException(
-                "An order must contain at least one item.");
-        }
-    }
-
-    private static void ValidateExpectedDeliveryDate(DateTime expectedDeliveryDate)
-    {
-        if (expectedDeliveryDate.Date < DateTime.Today)
-        {
-            throw new InvalidOperationException(
-                "Expected delivery date cannot be in the past.");
-        }
-    }
-
-    #endregion
-
-
-    #region DTO Mapping
-
-    private static OrderDto MapToOrderDto(Order order)
-    {
-        return new OrderDto
-        {
-            Id = order.Id,
-            OrderNumber = order.OrderNumber,
-            BranchId = order.BranchId,
-            CustomerId = order.CustomerId,
-            OrderDate = order.OrderDate,
-            ExpectedDeliveryDate = order.ExpectedDeliveryDate,
-            Status = (int)order.Status,
-            Subtotal = order.Subtotal,
-            DiscountAmount = order.DiscountAmount,
-            TaxAmount = order.TaxAmount,
-            GrandTotal = order.GrandTotal,
-            PaymentStatus = (int)order.PaymentStatus,
-            BalanceAmount = order.BalanceAmount,
-            Remarks = order.Remarks,
-
-            Items = order.Items.Select(i => new OrderItemDto
-            {
-                Id = i.Id,
-                ServiceCategoryId = i.ServiceCategoryId,
-                ServiceCategoryName = i.ServiceCategory?.Name ?? string.Empty,
-                GarmentTypeId = i.GarmentTypeId,
-                GarmentTypeName = i.GarmentType?.Name ?? string.Empty,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                ExpressService = i.ExpressService,
-                ExpressUnitPrice = i.ExpressUnitPrice,
-                LineTotal = i.LineTotal,
-                Notes = i.Notes
-            }).ToList()
-        };
-    }
-
-    private static OrderSummaryDto MapToSummaryDto(Order order)
-    {
-        return new OrderSummaryDto
-        {
-            Id = order.Id,
-            OrderNumber = order.OrderNumber,
-            CustomerId = order.CustomerId,
-            CustomerName = order.Customer == null
-                ? string.Empty
-                : $"{order.Customer.FirstName} {order.Customer.LastName}".Trim(),
-
-            OrderDate = order.OrderDate,
-            ExpectedDeliveryDate = order.ExpectedDeliveryDate,
-            Status = (int)order.Status,
-            GrandTotal = order.GrandTotal
-        };
-    }
-
-    #endregion
-    #region Query Methods
 
     public async Task<OrderDto?> GetByIdAsync(int id)
     {
@@ -196,10 +101,7 @@ public class OrderService : IOrderService
 
         var order = await _orderRepository.GetOrderWithItemsAsync(id);
 
-        if (order == null)
-            return null;
-
-        return MapToOrderDto(order);
+        return order == null ? null : MapToOrderDto(order);
     }
 
     public async Task<OrderDto?> GetByOrderNumberAsync(string orderNumber)
@@ -215,14 +117,12 @@ public class OrderService : IOrderService
         if (order == null)
             return null;
 
-        // Ensure navigation properties are loaded
         var completeOrder =
             await _orderRepository.GetOrderWithItemsAsync(order.Id);
 
-        if (completeOrder == null)
-            return null;
-
-        return MapToOrderDto(completeOrder);
+        return completeOrder == null
+            ? null
+            : MapToOrderDto(completeOrder);
     }
 
     public async Task<IEnumerable<OrderSummaryDto>> GetByCustomerAsync(
@@ -257,9 +157,6 @@ public class OrderService : IOrderService
             .ToList();
     }
 
-    #endregion
-    #region Update Methods
-
     public async Task<bool> UpdateStatusAsync(
         int id,
         UpdateOrderDto request)
@@ -269,6 +166,12 @@ public class OrderService : IOrderService
 
         ArgumentNullException.ThrowIfNull(request);
 
+        if (!Enum.IsDefined(typeof(OrderStatus), request.Status))
+        {
+            throw new InvalidOrderStatusTransitionException(
+                $"Order status '{request.Status}' is not valid.");
+        }
+
         var order = await _orderRepository.GetTrackedByIdAsync(id);
 
         if (order == null)
@@ -277,14 +180,19 @@ public class OrderService : IOrderService
         var newStatus = (OrderStatus)request.Status;
 
         if (order.Status == newStatus &&
-            string.Equals(order.Remarks, request.Remarks,
+            string.Equals(
+                order.Remarks,
+                request.Remarks,
                 StringComparison.Ordinal))
         {
             return true;
         }
 
+        ValidateStatusTransition(order.Status, newStatus);
+
         order.Status = newStatus;
         order.Remarks = request.Remarks;
+        order.UpdatedOn = DateTime.UtcNow;
 
         _orderRepository.Update(order);
 
@@ -293,5 +201,167 @@ public class OrderService : IOrderService
         return true;
     }
 
-    #endregion
+    private static void ValidateStatusTransition(
+        OrderStatus currentStatus,
+        OrderStatus newStatus)
+    {
+        if (currentStatus == OrderStatus.Delivered)
+        {
+            throw new InvalidOrderStatusTransitionException(
+                "A delivered order cannot be moved to another status.");
+        }
+
+        if (currentStatus == OrderStatus.Cancelled)
+        {
+            throw new InvalidOrderStatusTransitionException(
+                "A cancelled order cannot be moved to another status.");
+        }
+
+        if (newStatus == OrderStatus.Created)
+        {
+            throw new InvalidOrderStatusTransitionException(
+                "An order cannot be moved back to Created status.");
+        }
+
+        if (newStatus == OrderStatus.Cancelled)
+        {
+            if (currentStatus == OrderStatus.Ready ||
+                currentStatus == OrderStatus.OutForDelivery)
+            {
+                throw new InvalidOrderStatusTransitionException(
+                    $"Order cannot be cancelled after it reaches {currentStatus}.");
+            }
+
+            return;
+        }
+
+        var isValid = currentStatus switch
+        {
+            OrderStatus.Created =>
+                newStatus == OrderStatus.Received,
+
+            OrderStatus.Received =>
+                newStatus == OrderStatus.Washing ||
+                newStatus == OrderStatus.DryCleaning,
+
+            OrderStatus.Washing =>
+                newStatus == OrderStatus.Ironing,
+
+            OrderStatus.DryCleaning =>
+                newStatus == OrderStatus.Ironing,
+
+            OrderStatus.Ironing =>
+                newStatus == OrderStatus.QualityCheck,
+
+            OrderStatus.QualityCheck =>
+                newStatus == OrderStatus.Ready,
+
+            OrderStatus.Ready =>
+                newStatus == OrderStatus.OutForDelivery,
+
+            OrderStatus.OutForDelivery =>
+                newStatus == OrderStatus.Delivered,
+
+            _ => false
+        };
+
+        if (!isValid)
+        {
+            throw new InvalidOrderStatusTransitionException(
+                $"Invalid order status transition: " +
+                $"{currentStatus} -> {newStatus}.");
+        }
+    }
+
+    private async Task ValidateCreateRequestAsync(
+        CreateOrderDto request)
+    {
+        if (!await _branchRepository.ExistsAsync(request.BranchId))
+        {
+            throw new InvalidOperationException(
+                $"Branch '{request.BranchId}' does not exist.");
+        }
+
+        if (!await _customerRepository.ExistsAsync(request.CustomerId))
+        {
+            throw new InvalidOperationException(
+                $"Customer '{request.CustomerId}' does not exist.");
+        }
+
+        ValidateExpectedDeliveryDate(
+            request.ExpectedDeliveryDate);
+
+        if (request.Items == null || !request.Items.Any())
+        {
+            throw new InvalidOperationException(
+                "An order must contain at least one item.");
+        }
+    }
+
+    private static void ValidateExpectedDeliveryDate(
+        DateTime expectedDeliveryDate)
+    {
+        if (expectedDeliveryDate.Date < DateTime.Today)
+        {
+            throw new InvalidOperationException(
+                "Expected delivery date cannot be in the past.");
+        }
+    }
+
+    private static OrderDto MapToOrderDto(Order order)
+    {
+        return new OrderDto
+        {
+            Id = order.Id,
+            OrderNumber = order.OrderNumber,
+            BranchId = order.BranchId,
+            CustomerId = order.CustomerId,
+            OrderDate = order.OrderDate,
+            ExpectedDeliveryDate = order.ExpectedDeliveryDate,
+            Status = (int)order.Status,
+            Subtotal = order.Subtotal,
+            DiscountAmount = order.DiscountAmount,
+            TaxAmount = order.TaxAmount,
+            GrandTotal = order.GrandTotal,
+            PaymentStatus = (int)order.PaymentStatus,
+            BalanceAmount = order.BalanceAmount,
+            Remarks = order.Remarks,
+
+            Items = order.Items.Select(i => new OrderItemDto
+            {
+                Id = i.Id,
+                ServiceCategoryId = i.ServiceCategoryId,
+                ServiceCategoryName =
+                    i.ServiceCategory?.Name ?? string.Empty,
+                GarmentTypeId = i.GarmentTypeId,
+                GarmentTypeName =
+                    i.GarmentType?.Name ?? string.Empty,
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice,
+                ExpressService = i.ExpressService,
+                ExpressUnitPrice = i.ExpressUnitPrice,
+                LineTotal = i.LineTotal,
+                Notes = i.Notes
+            }).ToList()
+        };
+    }
+
+    private static OrderSummaryDto MapToSummaryDto(Order order)
+    {
+        return new OrderSummaryDto
+        {
+            Id = order.Id,
+            OrderNumber = order.OrderNumber,
+            CustomerId = order.CustomerId,
+
+            CustomerName = order.Customer == null
+                ? string.Empty
+                : $"{order.Customer.FirstName} {order.Customer.LastName}".Trim(),
+
+            OrderDate = order.OrderDate,
+            ExpectedDeliveryDate = order.ExpectedDeliveryDate,
+            Status = (int)order.Status,
+            GrandTotal = order.GrandTotal
+        };
+    }
 }
