@@ -1,5 +1,6 @@
 ﻿using Laundry.API.DTOs.GarmentType;
 using Laundry.API.Services;
+using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

@@ -6,6 +6,7 @@ using Laundry.API.Interfaces;
 using Laundry.API.Models.Pricing;
 using Laundry.API.Repositories;
 using Laundry.API.Repositories.Interfaces;
+using Laundry.API.Services.Interfaces;
 
 namespace Laundry.API.Services;
 
@@ -79,7 +80,8 @@ public class OrderService : IOrderService
                 UnitPrice = item.UnitPrice,
                 ExpressService = item.ExpressService,
                 ExpressUnitPrice = item.ExpressUnitPrice,
-                LineTotal = item.LineTotal
+                LineTotal = item.LineTotal,
+                Notes = item.Notes
             });
         }
 

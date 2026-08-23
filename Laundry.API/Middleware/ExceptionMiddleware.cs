@@ -31,13 +31,6 @@ public class ExceptionMiddleware
                 StatusCodes.Status409Conflict,
                 ex);
         }
-        catch (DuplicateServiceCategoryException ex)
-        {
-            await WriteErrorResponse(
-                context,
-                StatusCodes.Status409Conflict,
-                ex);
-        }
         catch (DuplicateCustomerException ex)
         {
             await WriteErrorResponse(
@@ -45,7 +38,42 @@ public class ExceptionMiddleware
                 StatusCodes.Status409Conflict,
                 ex);
         }
+        catch (DuplicateServiceCategoryException ex)
+        {
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status409Conflict,
+                ex);
+        }
+        catch (DuplicateBranchPricingException ex)
+        {
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status409Conflict,
+                ex);
+        }
+        catch (DuplicateGarmentTypeException ex)
+        {
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status409Conflict,
+                ex);
+        }
         catch (InvalidOrderStatusTransitionException ex)
+        {
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status400BadRequest,
+                ex);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status400BadRequest,
+                ex);
+        }
+        catch (ArgumentException ex)
         {
             await WriteErrorResponse(
                 context,
@@ -68,7 +96,9 @@ public class ExceptionMiddleware
         int statusCode,
         Exception exception)
     {
-        _logger.LogWarning(exception, exception.Message);
+        _logger.LogWarning(
+            exception,
+            exception.Message);
 
         await WriteErrorResponse(
             context,

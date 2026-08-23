@@ -13,11 +13,14 @@ public interface IOrderRepository
 
     Task<Order?> GetOrderWithItemsAsync(int orderId);
 
-    Task<List<Order>> GetOrdersByCustomerAsync(Guid customerId);
+    Task<List<Order>> GetOrdersByCustomerAsync(
+        Guid customerId);
 
-    Task<List<Order>> GetOrdersByBranchAsync(int branchId);
+    Task<List<Order>> GetOrdersByBranchAsync(
+        int branchId);
 
-    Task<List<Order>> GetOrdersByStatusAsync(OrderStatus status);
+    Task<List<Order>> GetOrdersByStatusAsync(
+        OrderStatus status);
 
     Task<Order?> GetTrackedByIdAsync(int id);
 

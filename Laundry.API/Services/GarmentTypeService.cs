@@ -1,6 +1,8 @@
 ﻿using Laundry.API.DTOs.GarmentType;
 using Laundry.API.Entities;
+using Laundry.API.Exceptions;
 using Laundry.API.Interfaces;
+using Laundry.API.Services.Interfaces;
 
 namespace Laundry.API.Services;
 
@@ -8,7 +10,8 @@ public class GarmentTypeService : IGarmentTypeService
 {
     private readonly IGarmentTypeRepository _repository;
 
-    public GarmentTypeService(IGarmentTypeRepository repository)
+    public GarmentTypeService(
+        IGarmentTypeRepository repository)
     {
         _repository = repository;
     }
@@ -24,21 +27,30 @@ public class GarmentTypeService : IGarmentTypeService
     {
         var garmentType = await _repository.GetByIdAsync(id);
 
-        return garmentType == null ? null : Map(garmentType);
+        return garmentType == null
+            ? null
+            : Map(garmentType);
     }
 
-    public async Task<GarmentTypeResponse> CreateAsync(CreateGarmentTypeRequest request)
+    public async Task<GarmentTypeResponse> CreateAsync(
+        CreateGarmentTypeRequest request)
     {
-        var existing = await _repository.GetByNameAsync(request.Name);
+        var name = request.Name.Trim();
+
+        var existing = await _repository.GetByNameAsync(name);
 
         if (existing != null)
-            throw new InvalidOperationException("Garment Type already exists.");
+        {
+            throw new DuplicateGarmentTypeException(name);
+        }
 
         var garmentType = new GarmentType
         {
-            Name = request.Name,
-            Description = request.Description,
-            Icon = request.Icon
+            Name = name,
+            Description = request.Description?.Trim() ?? string.Empty,
+            Icon = string.IsNullOrWhiteSpace(request.Icon)
+                ? null
+                : request.Icon.Trim()
         };
 
         await _repository.AddAsync(garmentType);
@@ -47,16 +59,37 @@ public class GarmentTypeService : IGarmentTypeService
         return Map(garmentType);
     }
 
-    public async Task<bool> UpdateAsync(int id, CreateGarmentTypeRequest request)
+    public async Task<bool> UpdateAsync(
+        int id,
+        CreateGarmentTypeRequest request)
     {
         var garmentType = await _repository.GetByIdAsync(id);
 
         if (garmentType == null)
+        {
             return false;
+        }
 
-        garmentType.Name = request.Name;
-        garmentType.Description = request.Description;
-        garmentType.Icon = request.Icon;
+        var name = request.Name.Trim();
+
+        var existing = await _repository.GetByNameAsync(name);
+
+        if (existing != null && existing.Id != id)
+        {
+            throw new DuplicateGarmentTypeException(name);
+        }
+
+        garmentType.Name = name;
+
+        garmentType.Description =
+            request.Description?.Trim() ?? string.Empty;
+
+        garmentType.Icon =
+            string.IsNullOrWhiteSpace(request.Icon)
+                ? null
+                : request.Icon.Trim();
+
+        garmentType.UpdatedOn = DateTime.Now;
 
         await _repository.UpdateAsync(garmentType);
         await _repository.SaveChangesAsync();
@@ -69,7 +102,9 @@ public class GarmentTypeService : IGarmentTypeService
         var garmentType = await _repository.GetByIdAsync(id);
 
         if (garmentType == null)
+        {
             return false;
+        }
 
         await _repository.DeleteAsync(garmentType);
         await _repository.SaveChangesAsync();
@@ -77,13 +112,15 @@ public class GarmentTypeService : IGarmentTypeService
         return true;
     }
 
-    private static GarmentTypeResponse Map(GarmentType garmentType)
+    private static GarmentTypeResponse Map(
+        GarmentType garmentType)
     {
         return new GarmentTypeResponse
         {
             Id = garmentType.Id,
             Name = garmentType.Name,
             Description = garmentType.Description,
+            Icon = garmentType.Icon,
             IsActive = garmentType.IsActive
         };
     }

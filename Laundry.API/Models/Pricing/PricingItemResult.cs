@@ -15,4 +15,6 @@ public class PricingItemResult
     public decimal? ExpressUnitPrice { get; set; }
 
     public decimal LineTotal { get; set; }
+
+    public string? Notes { get; set; }
 }

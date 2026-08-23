@@ -16,9 +16,6 @@ public class CreateOrderDto
     [Range(0, 100000)]
     public decimal DiscountAmount { get; set; }
 
-    [Required]
-    public int PaymentMethod { get; set; }
-
     [MaxLength(1000)]
     public string? Remarks { get; set; }
 

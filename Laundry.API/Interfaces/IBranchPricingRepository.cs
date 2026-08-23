@@ -8,6 +8,8 @@ public interface IBranchPricingRepository
 
     Task<BranchPricing?> GetByIdAsync(int id);
 
+    Task<BranchPricing?> GetForUpdateAsync(int id);
+
     Task<IEnumerable<BranchPricing>> GetByBranchAsync(int branchId);
 
     Task<BranchPricing?> GetByCombinationAsync(
@@ -22,14 +24,14 @@ public interface IBranchPricingRepository
 
     Task AddAsync(BranchPricing pricing);
 
-    Task<BranchPricing?> GetPricingAsync(
-    int branchId,
-    int serviceCategoryId,
-    int garmentTypeId);
-
     void Update(BranchPricing pricing);
 
     void Delete(BranchPricing pricing);
 
     Task SaveChangesAsync();
+
+    Task<BranchPricing?> GetPricingAsync(
+        int branchId,
+        int serviceCategoryId,
+        int garmentTypeId);
 }

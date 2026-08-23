@@ -8,7 +8,8 @@ public class PricingService : IPricingService
 {
     private readonly IBranchPricingRepository _pricingRepository;
 
-    public PricingService(IBranchPricingRepository pricingRepository)
+    public PricingService(
+        IBranchPricingRepository pricingRepository)
     {
         _pricingRepository = pricingRepository;
     }
@@ -29,8 +30,10 @@ public class PricingService : IPricingService
 
             if (pricing == null)
             {
-                throw new Exception(
-                    $"Pricing not configured for ServiceCategoryId={item.ServiceCategoryId}, GarmentTypeId={item.GarmentTypeId}");
+                throw new InvalidOperationException(
+                    $"Pricing not configured for " +
+                    $"ServiceCategoryId={item.ServiceCategoryId}, " +
+                    $"GarmentTypeId={item.GarmentTypeId}");
             }
 
             decimal unitPrice;
@@ -39,11 +42,12 @@ public class PricingService : IPricingService
             {
                 if (!pricing.IsExpressAvailable)
                 {
-                    throw new Exception(
+                    throw new InvalidOperationException(
                         "Express service is not available for this garment.");
                 }
 
-                unitPrice = pricing.ExpressPrice ?? pricing.Price;
+                unitPrice =
+                    pricing.ExpressPrice ?? pricing.Price;
             }
             else
             {
@@ -54,13 +58,31 @@ public class PricingService : IPricingService
 
             result.Items.Add(new PricingItemResult
             {
-                ServiceCategoryId = item.ServiceCategoryId,
-                GarmentTypeId = item.GarmentTypeId,
-                Quantity = item.Quantity,
-                UnitPrice = pricing.Price,
-                ExpressService = item.ExpressService,
-                ExpressUnitPrice = pricing.ExpressPrice,
-                LineTotal = lineTotal
+                ServiceCategoryId =
+                    item.ServiceCategoryId,
+
+                GarmentTypeId =
+                    item.GarmentTypeId,
+
+                Quantity =
+                    item.Quantity,
+
+                UnitPrice =
+                    pricing.Price,
+
+                ExpressService =
+                    item.ExpressService,
+
+                ExpressUnitPrice =
+                    pricing.ExpressPrice,
+
+                LineTotal =
+                    lineTotal,
+
+                Notes =
+                    string.IsNullOrWhiteSpace(item.Notes)
+                        ? null
+                        : item.Notes.Trim()
             });
 
             result.Subtotal += lineTotal;
