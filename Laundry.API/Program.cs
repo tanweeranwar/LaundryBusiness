@@ -50,6 +50,8 @@ builder.Services.AddScoped<IJwtService, JwtService>();
 // Branch
 builder.Services.AddScoped<IBranchRepository, BranchRepository>();
 builder.Services.AddScoped<IBranchService, BranchService>();
+builder.Services.AddScoped<IServiceCategoryService, ServiceCategoryService>();
+builder.Services.AddScoped<IServiceCategoryRepository, ServiceCategoryRepository>();
 
 // Branch Pricing
 builder.Services.AddScoped<IBranchPricingRepository, BranchPricingRepository>();
