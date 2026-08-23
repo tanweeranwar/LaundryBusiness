@@ -57,6 +57,7 @@ builder.Services.AddScoped<IBranchPricingService, BranchPricingService>();
 
 // Customer
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
 
 // Garment Type
 builder.Services.AddScoped<IGarmentTypeRepository, GarmentTypeRepository>();

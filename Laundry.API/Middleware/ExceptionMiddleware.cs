@@ -31,6 +31,13 @@ public class ExceptionMiddleware
                 StatusCodes.Status409Conflict,
                 ex);
         }
+        catch (DuplicateCustomerException ex)
+        {
+            await WriteErrorResponse(
+                context,
+                StatusCodes.Status409Conflict,
+                ex);
+        }
         catch (InvalidOrderStatusTransitionException ex)
         {
             await WriteErrorResponse(

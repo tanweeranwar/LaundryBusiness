@@ -20,6 +20,15 @@ public class CustomerRepository : ICustomerRepository
             .FirstOrDefaultAsync(x => x.Id == id);
     }
 
+    public async Task<IEnumerable<Customer>> GetAllAsync()
+    {
+        return await _context.Customers
+            .AsNoTracking()
+            .OrderBy(x => x.FirstName)
+            .ThenBy(x => x.LastName)
+            .ToListAsync();
+    }
+
     public async Task<bool> ExistsAsync(Guid id)
     {
         return await _context.Customers
@@ -29,6 +38,28 @@ public class CustomerRepository : ICustomerRepository
     public async Task AddAsync(Customer customer)
     {
         await _context.Customers.AddAsync(customer);
+    }
+
+    public async Task<bool> ExistsByMobileNumberAsync(
+    string mobileNumber,
+    Guid? excludeCustomerId = null)
+    {
+        return await _context.Customers
+            .AnyAsync(x =>
+                x.MobileNumber == mobileNumber &&
+                (!excludeCustomerId.HasValue ||
+                 x.Id != excludeCustomerId.Value));
+    }
+
+    public async Task<bool> ExistsByEmailAsync(
+        string email,
+        Guid? excludeCustomerId = null)
+    {
+        return await _context.Customers
+            .AnyAsync(x =>
+                x.Email == email &&
+                (!excludeCustomerId.HasValue ||
+                 x.Id != excludeCustomerId.Value));
     }
 
     public Task UpdateAsync(Customer customer)

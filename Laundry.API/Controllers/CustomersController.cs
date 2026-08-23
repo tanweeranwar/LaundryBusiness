@@ -1,9 +1,7 @@
-﻿using Laundry.API.Data;
-using Laundry.API.DTOs.Customer;
-using Laundry.API.Entities;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using Laundry.API.DTOs.Customer;
+using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Laundry.API.Controllers;
 
@@ -12,103 +10,96 @@ namespace Laundry.API.Controllers;
 [Authorize]
 public class CustomersController : ControllerBase
 {
-    private readonly LaundryDbContext _context;
+    private readonly ICustomerService _customerService;
 
-    public CustomersController(LaundryDbContext context)
+    public CustomersController(ICustomerService customerService)
     {
-        _context = context;
+        _customerService = customerService;
     }
 
+    /// <summary>
+    /// Creates a new customer.
+    /// </summary>
     [HttpPost]
-    public async Task<ActionResult<CustomerResponse>> Create(CreateCustomerRequest request)
+    [ProducesResponseType(
+        typeof(CustomerResponse),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<CustomerResponse>> Create(
+        CreateCustomerRequest request)
     {
-        var customer = new Customer
-        {
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            MobileNumber = request.MobileNumber,
-            Email = request.Email
-        };
+        var customer =
+            await _customerService.CreateAsync(request);
 
-        _context.Customers.Add(customer);
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new CustomerResponse
-        {
-            Id = customer.Id,
-            FirstName = customer.FirstName,
-            LastName = customer.LastName,
-            MobileNumber = customer.MobileNumber,
-            Email = customer.Email
-        });
+        return Ok(customer);
     }
 
+    /// <summary>
+    /// Gets all customers.
+    /// </summary>
     [HttpGet]
+    [ProducesResponseType(
+        typeof(IEnumerable<CustomerResponse>),
+        StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CustomerResponse>>> GetAll()
     {
-        var customers = await _context.Customers
-            .Select(c => new CustomerResponse
-            {
-                Id = c.Id,
-                FirstName = c.FirstName,
-                LastName = c.LastName,
-                MobileNumber = c.MobileNumber,
-                Email = c.Email
-            })
-            .ToListAsync();
+        var customers =
+            await _customerService.GetAllAsync();
 
         return Ok(customers);
     }
 
+    /// <summary>
+    /// Gets a customer by Id.
+    /// </summary>
     [HttpGet("{id:guid}")]
+    [ProducesResponseType(
+        typeof(CustomerResponse),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CustomerResponse>> GetById(Guid id)
     {
-        var customer = await _context.Customers.FindAsync(id);
+        var customer =
+            await _customerService.GetByIdAsync(id);
 
         if (customer == null)
             return NotFound();
 
-        return Ok(new CustomerResponse
-        {
-            Id = customer.Id,
-            FirstName = customer.FirstName,
-            LastName = customer.LastName,
-            MobileNumber = customer.MobileNumber,
-            Email = customer.Email
-        });
+        return Ok(customer);
     }
 
+    /// <summary>
+    /// Updates an existing customer.
+    /// </summary>
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, UpdateCustomerRequest request)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(
+        Guid id,
+        UpdateCustomerRequest request)
     {
-        var customer = await _context.Customers.FindAsync(id);
+        var updated =
+            await _customerService.UpdateAsync(id, request);
 
-        if (customer == null)
+        if (!updated)
             return NotFound();
-
-        customer.FirstName = request.FirstName;
-        customer.LastName = request.LastName;
-        customer.MobileNumber = request.MobileNumber;
-        customer.Email = request.Email;
-        customer.UpdatedOn = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
 
         return NoContent();
     }
 
+    /// <summary>
+    /// Deletes an existing customer.
+    /// </summary>
     [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var customer = await _context.Customers.FindAsync(id);
+        var deleted =
+            await _customerService.DeleteAsync(id);
 
-        if (customer == null)
+        if (!deleted)
             return NotFound();
-
-        _context.Customers.Remove(customer);
-
-        await _context.SaveChangesAsync();
 
         return NoContent();
     }
