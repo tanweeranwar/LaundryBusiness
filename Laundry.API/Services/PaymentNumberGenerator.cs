@@ -1,4 +1,4 @@
-﻿using Laundry.API.Data;
+using Laundry.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Laundry.API.Services.Interfaces;
 
@@ -17,6 +17,9 @@ public class PaymentNumberGenerator : IPaymentNumberGenerator
     {
         var today = DateTime.Now.ToString("yyyyMMdd");
 
+        // Generate a unique number based on the current payment count.
+        // The unique database constraint on PaymentNumber is the final
+        // protection against duplicate numbers under concurrent requests.
         var count = await _context.Payments
             .CountAsync(p => p.PaidOn.Date == DateTime.Now.Date);
 
