@@ -3,6 +3,7 @@ using System;
 using Laundry.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laundry.API.Migrations
 {
     [DbContext(typeof(LaundryDbContext))]
-    partial class LaundryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260824013722_AddProcessingWorkflow")]
+    partial class AddProcessingWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -708,32 +711,6 @@ namespace Laundry.API.Migrations
                         .IsUnique();
 
                     b.ToTable("ProcessingWorkflows");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            Name = "Wash",
-                            ServiceCategoryId = 2
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            Name = "Dry Clean",
-                            ServiceCategoryId = 3
-                        },
-                        new
-                        {
-                            Id = 3,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            Name = "Iron",
-                            ServiceCategoryId = 4
-                        });
                 });
 
             modelBuilder.Entity("Laundry.API.Entities.ProcessingWorkflowStep", b =>
@@ -771,68 +748,6 @@ namespace Laundry.API.Migrations
                         .IsUnique();
 
                     b.ToTable("ProcessingWorkflowSteps");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            IsRequired = true,
-                            ProcessingWorkflowId = 1,
-                            Sequence = 1,
-                            StepType = 1
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            IsRequired = true,
-                            ProcessingWorkflowId = 1,
-                            Sequence = 2,
-                            StepType = 5
-                        },
-                        new
-                        {
-                            Id = 3,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            IsRequired = true,
-                            ProcessingWorkflowId = 2,
-                            Sequence = 1,
-                            StepType = 3
-                        },
-                        new
-                        {
-                            Id = 4,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            IsRequired = true,
-                            ProcessingWorkflowId = 2,
-                            Sequence = 2,
-                            StepType = 5
-                        },
-                        new
-                        {
-                            Id = 5,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            IsRequired = true,
-                            ProcessingWorkflowId = 3,
-                            Sequence = 1,
-                            StepType = 4
-                        },
-                        new
-                        {
-                            Id = 6,
-                            CreatedOn = new DateTime(2026, 8, 24, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            IsRequired = true,
-                            ProcessingWorkflowId = 3,
-                            Sequence = 2,
-                            StepType = 5
-                        });
                 });
 
             modelBuilder.Entity("Laundry.API.Entities.ServiceCategory", b =>
@@ -961,8 +876,8 @@ namespace Laundry.API.Migrations
             modelBuilder.Entity("Laundry.API.Entities.OrderItemProcessing", b =>
                 {
                     b.HasOne("Laundry.API.Entities.OrderItem", "OrderItem")
-                        .WithOne("OrderItemProcessing")
-                        .HasForeignKey("Laundry.API.Entities.OrderItemProcessing", "OrderItemId")
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1056,11 +971,6 @@ namespace Laundry.API.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Payments");
-                });
-
-            modelBuilder.Entity("Laundry.API.Entities.OrderItem", b =>
-                {
-                    b.Navigation("OrderItemProcessing");
                 });
 
             modelBuilder.Entity("Laundry.API.Entities.OrderItemProcessing", b =>

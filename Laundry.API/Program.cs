@@ -84,6 +84,9 @@ builder.Services.AddScoped<IPickupService, PickupService>();
 builder.Services.AddScoped<IDeliveryRepository, DeliveryRepository>();
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 
+builder.Services.AddScoped<IProcessingService, ProcessingService>();
+builder.Services.AddScoped<IProcessingRepository, ProcessingRepository>();
+
 builder.Services.AddScoped<
     IOrderStatusHistoryRepository,
     OrderStatusHistoryRepository>();

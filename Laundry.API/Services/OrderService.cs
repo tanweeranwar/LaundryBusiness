@@ -389,4 +389,49 @@ public class OrderService : IOrderService
             GrandTotal = order.GrandTotal
         };
     }
+
+    public async Task<bool> MarkReadyAfterProcessingAsync(int orderId)
+    {
+        if (orderId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(orderId));
+
+        var order = await _orderRepository.GetTrackedByIdAsync(orderId);
+
+        if (order == null)
+            return false;
+
+        if (order.Status == OrderStatus.Ready)
+            return true;
+
+        if (order.Status != OrderStatus.Received)
+        {
+            throw new InvalidOrderStatusTransitionException(
+                $"Order '{orderId}' cannot be marked Ready from " +
+                $"status '{order.Status}'.");
+        }
+
+        var previousStatus = order.Status;
+
+        order.Status = OrderStatus.Ready;
+        order.Remarks = "All order items completed processing.";
+        order.UpdatedOn = DateTime.UtcNow;
+
+        _orderRepository.Update(order);
+
+        var history = new OrderStatusHistory
+        {
+            OrderId = order.Id,
+            FromStatus = previousStatus,
+            ToStatus = OrderStatus.Ready,
+            Remarks = "All order items completed processing.",
+            ChangedBy = null,
+            ChangedOn = DateTime.Now
+        };
+
+        await _orderStatusHistoryRepository.AddAsync(history);
+
+        await _orderRepository.SaveChangesAsync();
+
+        return true;
+    }
 }

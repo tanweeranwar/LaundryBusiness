@@ -22,4 +22,6 @@ public interface IOrderService
     Task<bool> UpdateStatusAsync(
         int id,
         UpdateOrderDto request);
+
+    Task<bool> MarkReadyAfterProcessingAsync(int orderId);
 }

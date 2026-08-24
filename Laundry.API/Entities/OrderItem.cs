@@ -28,4 +28,6 @@ public class OrderItem : BaseEntity
     public ServiceCategory ServiceCategory { get; set; } = null!;
 
     public GarmentType GarmentType { get; set; } = null!;
+
+    public OrderItemProcessing? OrderItemProcessing { get; set; }
 }

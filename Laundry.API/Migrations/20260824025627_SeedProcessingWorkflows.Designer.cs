@@ -3,6 +3,7 @@ using System;
 using Laundry.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laundry.API.Migrations
 {
     [DbContext(typeof(LaundryDbContext))]
-    partial class LaundryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260824025627_SeedProcessingWorkflows")]
+    partial class SeedProcessingWorkflows
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -961,8 +964,8 @@ namespace Laundry.API.Migrations
             modelBuilder.Entity("Laundry.API.Entities.OrderItemProcessing", b =>
                 {
                     b.HasOne("Laundry.API.Entities.OrderItem", "OrderItem")
-                        .WithOne("OrderItemProcessing")
-                        .HasForeignKey("Laundry.API.Entities.OrderItemProcessing", "OrderItemId")
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1056,11 +1059,6 @@ namespace Laundry.API.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Payments");
-                });
-
-            modelBuilder.Entity("Laundry.API.Entities.OrderItem", b =>
-                {
-                    b.Navigation("OrderItemProcessing");
                 });
 
             modelBuilder.Entity("Laundry.API.Entities.OrderItemProcessing", b =>

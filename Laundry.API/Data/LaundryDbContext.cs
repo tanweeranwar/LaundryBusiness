@@ -1,5 +1,6 @@
 ﻿using Laundry.API.Configurations;
 using Laundry.API.Entities;
+using Laundry.API.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Laundry.API.Data;
@@ -10,6 +11,9 @@ public class LaundryDbContext : DbContext
         : base(options)
     {
     }
+
+    private static readonly DateTime ProcessingSeedCreatedOn =
+    new(2026, 8, 24, 0, 0, 0, DateTimeKind.Unspecified);
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Branch> Branches => Set<Branch>();
@@ -22,6 +26,18 @@ public class LaundryDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Pickup> Pickups => Set<Pickup>();
     public DbSet<Delivery> Deliveries => Set<Delivery>();
+
+    public DbSet<ProcessingWorkflow> ProcessingWorkflows
+    => Set<ProcessingWorkflow>();
+
+    public DbSet<ProcessingWorkflowStep> ProcessingWorkflowSteps
+        => Set<ProcessingWorkflowStep>();
+
+    public DbSet<OrderItemProcessing> OrderItemProcessings
+        => Set<OrderItemProcessing>();
+
+    public DbSet<OrderItemProcessingStep> OrderItemProcessingSteps
+        => Set<OrderItemProcessingStep>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,6 +64,11 @@ public class LaundryDbContext : DbContext
         ConfigureOrderItem(modelBuilder);
         ConfigurePickup(modelBuilder);
         ConfigureDelivery(modelBuilder);
+        ConfigureProcessingWorkflow(modelBuilder);
+        ConfigureProcessingWorkflowStep(modelBuilder);
+        ConfigureOrderItemProcessing(modelBuilder);
+        ConfigureOrderItemProcessingStep(modelBuilder);
+        SeedProcessingWorkflows(modelBuilder);
 
         modelBuilder.ApplyConfiguration(new PaymentConfiguration());
     }
@@ -262,5 +283,201 @@ public class LaundryDbContext : DbContext
             entity.HasIndex(x => x.Status);
             entity.HasIndex(x => x.ScheduledDate);
         });
+    }
+
+    private static void ConfigureProcessingWorkflow(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ProcessingWorkflow>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Name)
+                .IsRequired()
+                .HasMaxLength(150);
+
+            entity.HasOne(x => x.ServiceCategory)
+                .WithMany()
+                .HasForeignKey(x => x.ServiceCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ServiceCategoryId)
+                .IsUnique();
+        });
+    }
+
+    private static void ConfigureProcessingWorkflowStep(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ProcessingWorkflowStep>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.ProcessingWorkflow)
+                .WithMany(x => x.Steps)
+                .HasForeignKey(x => x.ProcessingWorkflowId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => new
+            {
+                x.ProcessingWorkflowId,
+                x.Sequence
+            })
+            .IsUnique();
+        });
+    }
+
+    private static void ConfigureOrderItemProcessing(
+    ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OrderItemProcessing>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.AssignedTo)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Remarks)
+                .HasMaxLength(500);
+
+            entity.HasOne(x => x.OrderItem)
+                .WithOne(x => x.OrderItemProcessing)
+                .HasForeignKey<OrderItemProcessing>(
+                    x => x.OrderItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ProcessingWorkflow)
+                .WithMany()
+                .HasForeignKey(x => x.ProcessingWorkflowId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.OrderItemId)
+                .IsUnique();
+
+            entity.HasIndex(x => x.Status);
+        });
+    }
+
+    private static void ConfigureOrderItemProcessingStep(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OrderItemProcessingStep>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.AssignedTo)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Remarks)
+                .HasMaxLength(500);
+
+            entity.HasOne(x => x.OrderItemProcessing)
+                .WithMany(x => x.Steps)
+                .HasForeignKey(x => x.OrderItemProcessingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ProcessingWorkflowStep)
+                .WithMany()
+                .HasForeignKey(x => x.ProcessingWorkflowStepId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new
+            {
+                x.OrderItemProcessingId,
+                x.ProcessingWorkflowStepId
+            })
+            .IsUnique();
+
+            entity.HasIndex(x => x.Status);
+        });
+    }
+
+    private static void SeedProcessingWorkflows(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ProcessingWorkflow>().HasData(
+            new ProcessingWorkflow
+            {
+                Id = 1,
+                ServiceCategoryId = 2,
+                Name = "Wash",
+                IsActive = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            },
+            new ProcessingWorkflow
+            {
+                Id = 2,
+                ServiceCategoryId = 3,
+                Name = "Dry Clean",
+                IsActive = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            },
+            new ProcessingWorkflow
+            {
+                Id = 3,
+                ServiceCategoryId = 4,
+                Name = "Iron",
+                IsActive = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            }
+        );
+
+        modelBuilder.Entity<ProcessingWorkflowStep>().HasData(
+            // Wash
+            new ProcessingWorkflowStep
+            {
+                Id = 1,
+                ProcessingWorkflowId = 1,
+                StepType = ProcessingStepType.Washing,
+                Sequence = 1,
+                IsRequired = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            },
+            new ProcessingWorkflowStep
+            {
+                Id = 2,
+                ProcessingWorkflowId = 1,
+                StepType = ProcessingStepType.QualityCheck,
+                Sequence = 2,
+                IsRequired = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            },
+
+            // Dry Clean
+            new ProcessingWorkflowStep
+            {
+                Id = 3,
+                ProcessingWorkflowId = 2,
+                StepType = ProcessingStepType.DryCleaning,
+                Sequence = 1,
+                IsRequired = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            },
+            new ProcessingWorkflowStep
+            {
+                Id = 4,
+                ProcessingWorkflowId = 2,
+                StepType = ProcessingStepType.QualityCheck,
+                Sequence = 2,
+                IsRequired = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            },
+
+            // Iron
+            new ProcessingWorkflowStep
+            {
+                Id = 5,
+                ProcessingWorkflowId = 3,
+                StepType = ProcessingStepType.Ironing,
+                Sequence = 1,
+                IsRequired = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            },
+            new ProcessingWorkflowStep
+            {
+                Id = 6,
+                ProcessingWorkflowId = 3,
+                StepType = ProcessingStepType.QualityCheck,
+                Sequence = 2,
+                IsRequired = true,
+                CreatedOn = ProcessingSeedCreatedOn
+            }
+        );
     }
 }
