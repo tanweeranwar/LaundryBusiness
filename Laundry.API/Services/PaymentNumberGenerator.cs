@@ -15,14 +15,23 @@ public class PaymentNumberGenerator : IPaymentNumberGenerator
 
     public async Task<string> GenerateAsync()
     {
-        var today = DateTime.Now.ToString("yyyyMMdd");
+        if (_context.Database.CurrentTransaction == null)
+        {
+            throw new InvalidOperationException(
+                "Payment number generation must run inside a database transaction.");
+        }
 
-        // Generate a unique number based on the current payment count.
-        // The unique database constraint on PaymentNumber is the final
-        // protection against duplicate numbers under concurrent requests.
+        // Serialize payment-number generation across application instances.
+        // The transaction remains open until PaymentService commits the payment.
+        await _context.Database.ExecuteSqlRawAsync(
+            "SELECT pg_advisory_xact_lock(hashtext('LaundryApp.PaymentNumber'));");
+
+        var today = DateTime.Now.Date;
+        var todayText = today.ToString("yyyyMMdd");
+
         var count = await _context.Payments
-            .CountAsync(p => p.PaidOn.Date == DateTime.Now.Date);
+            .CountAsync(p => p.PaidOn.Date == today);
 
-        return $"PAY-{today}-{(count + 1):D6}";
+        return $"PAY-{todayText}-{(count + 1):D6}";
     }
 }
