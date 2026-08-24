@@ -1,4 +1,4 @@
-﻿using Laundry.API.DTOs.Orders;
+using Laundry.API.DTOs.Orders;
 using Laundry.API.Entities;
 using Laundry.API.Enums;
 using Laundry.API.Exceptions;
@@ -52,21 +52,16 @@ public class OrderService : IOrderService
             BranchId = request.BranchId,
             CustomerId = request.CustomerId,
             OrderDate = DateTime.Now,
-
             ExpectedDeliveryDate = DateTime.SpecifyKind(
                 request.ExpectedDeliveryDate,
                 DateTimeKind.Local),
-
             Status = OrderStatus.Created,
-
             PaymentStatus = OrderPaymentStatus.Pending,
-
             Subtotal = pricing.Subtotal,
             DiscountAmount = pricing.Discount,
             TaxAmount = pricing.Tax,
             GrandTotal = pricing.GrandTotal,
             BalanceAmount = pricing.GrandTotal,
-
             Remarks = request.Remarks
         };
 
@@ -88,14 +83,11 @@ public class OrderService : IOrderService
         await _orderRepository.AddAsync(order);
         await _orderRepository.SaveChangesAsync();
 
-        var savedOrder =
-            await _orderRepository.GetOrderWithItemsAsync(order.Id);
+        var savedOrder = await _orderRepository.GetOrderWithItemsAsync(order.Id);
 
         if (savedOrder == null)
-        {
             throw new InvalidOperationException(
                 "Order was created but could not be loaded.");
-        }
 
         return MapToOrderDto(savedOrder);
     }
@@ -106,7 +98,6 @@ public class OrderService : IOrderService
             throw new ArgumentOutOfRangeException(nameof(id));
 
         var order = await _orderRepository.GetOrderWithItemsAsync(id);
-
         return order == null ? null : MapToOrderDto(order);
     }
 
@@ -117,55 +108,43 @@ public class OrderService : IOrderService
                 "Order number is required.",
                 nameof(orderNumber));
 
-        var order =
-            await _orderRepository.GetByOrderNumberAsync(orderNumber.Trim());
+        var order = await _orderRepository.GetByOrderNumberAsync(orderNumber.Trim());
 
         if (order == null)
             return null;
 
-        var completeOrder =
-            await _orderRepository.GetOrderWithItemsAsync(order.Id);
+        var completeOrder = await _orderRepository.GetOrderWithItemsAsync(order.Id);
 
-        return completeOrder == null
-            ? null
-            : MapToOrderDto(completeOrder);
+        return completeOrder == null ? null : MapToOrderDto(completeOrder);
     }
 
-    public async Task<IEnumerable<OrderSummaryDto>> GetByCustomerAsync(
-        Guid customerId)
+    public async Task<IEnumerable<OrderSummaryDto>> GetByCustomerAsync(Guid customerId)
     {
         if (customerId == Guid.Empty)
             throw new ArgumentException(
                 "Customer Id is invalid.",
                 nameof(customerId));
 
-        var orders =
-            await _orderRepository.GetOrdersByCustomerAsync(customerId);
+        var orders = await _orderRepository.GetOrdersByCustomerAsync(customerId);
 
-        return orders
-            .OrderByDescending(x => x.OrderDate)
+        return orders.OrderByDescending(x => x.OrderDate)
             .Select(MapToSummaryDto)
             .ToList();
     }
 
-    public async Task<IEnumerable<OrderSummaryDto>> GetByBranchAsync(
-        int branchId)
+    public async Task<IEnumerable<OrderSummaryDto>> GetByBranchAsync(int branchId)
     {
         if (branchId <= 0)
             throw new ArgumentOutOfRangeException(nameof(branchId));
 
-        var orders =
-            await _orderRepository.GetOrdersByBranchAsync(branchId);
+        var orders = await _orderRepository.GetOrdersByBranchAsync(branchId);
 
-        return orders
-            .OrderByDescending(x => x.OrderDate)
+        return orders.OrderByDescending(x => x.OrderDate)
             .Select(MapToSummaryDto)
             .ToList();
     }
 
-    public async Task<bool> UpdateStatusAsync(
-        int id,
-        UpdateOrderDto request)
+    public async Task<bool> UpdateStatusAsync(int id, UpdateOrderDto request)
     {
         if (id <= 0)
             throw new ArgumentOutOfRangeException(nameof(id));
@@ -186,14 +165,23 @@ public class OrderService : IOrderService
         var newStatus = (OrderStatus)request.Status;
         var previousStatus = order.Status;
 
-        // No actual status change.
-        // Allow remarks-only update without creating history.
-        if (previousStatus == newStatus &&
-            string.Equals(
-                order.Remarks,
-                request.Remarks,
-                StringComparison.Ordinal))
+        // A status-preserving request is a remarks-only update.
+        // It should not be subjected to transition validation or create history.
+        if (previousStatus == newStatus)
         {
+            if (string.Equals(
+                    order.Remarks,
+                    request.Remarks,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            order.Remarks = request.Remarks;
+            order.UpdatedOn = DateTime.UtcNow;
+            _orderRepository.Update(order);
+
+            await _orderRepository.SaveChangesAsync();
             return true;
         }
 
@@ -205,22 +193,17 @@ public class OrderService : IOrderService
 
         _orderRepository.Update(order);
 
-        // Record status transition only when the status actually changes.
-        if (previousStatus != newStatus)
+        var history = new OrderStatusHistory
         {
-            var history = new OrderStatusHistory
-            {
-                OrderId = order.Id,
-                FromStatus = previousStatus,
-                ToStatus = newStatus,
-                Remarks = request.Remarks,
-                ChangedBy = null,
-                ChangedOn = DateTime.Now
-            };
+            OrderId = order.Id,
+            FromStatus = previousStatus,
+            ToStatus = newStatus,
+            Remarks = request.Remarks,
+            ChangedBy = null,
+            ChangedOn = DateTime.Now
+        };
 
-            await _orderStatusHistoryRepository.AddAsync(history);
-        }
-
+        await _orderStatusHistoryRepository.AddAsync(history);
         await _orderRepository.SaveChangesAsync();
 
         return true;
@@ -262,44 +245,27 @@ public class OrderService : IOrderService
 
         var isValid = currentStatus switch
         {
-            OrderStatus.Created =>
-                newStatus == OrderStatus.Received,
-
+            OrderStatus.Created => newStatus == OrderStatus.Received,
             OrderStatus.Received =>
                 newStatus == OrderStatus.Washing ||
                 newStatus == OrderStatus.DryCleaning,
-
-            OrderStatus.Washing =>
-                newStatus == OrderStatus.Ironing,
-
-            OrderStatus.DryCleaning =>
-                newStatus == OrderStatus.Ironing,
-
-            OrderStatus.Ironing =>
-                newStatus == OrderStatus.QualityCheck,
-
-            OrderStatus.QualityCheck =>
-                newStatus == OrderStatus.Ready,
-
-            OrderStatus.Ready =>
-                newStatus == OrderStatus.OutForDelivery,
-
-            OrderStatus.OutForDelivery =>
-                newStatus == OrderStatus.Delivered,
-
+            OrderStatus.Washing => newStatus == OrderStatus.Ironing,
+            OrderStatus.DryCleaning => newStatus == OrderStatus.Ironing,
+            OrderStatus.Ironing => newStatus == OrderStatus.QualityCheck,
+            OrderStatus.QualityCheck => newStatus == OrderStatus.Ready,
+            OrderStatus.Ready => newStatus == OrderStatus.OutForDelivery,
+            OrderStatus.OutForDelivery => newStatus == OrderStatus.Delivered,
             _ => false
         };
 
         if (!isValid)
         {
             throw new InvalidOrderStatusTransitionException(
-                $"Invalid order status transition: " +
-                $"{currentStatus} -> {newStatus}.");
+                $"Invalid order status transition: {currentStatus} -> {newStatus}.");
         }
     }
 
-    private async Task ValidateCreateRequestAsync(
-        CreateOrderDto request)
+    private async Task ValidateCreateRequestAsync(CreateOrderDto request)
     {
         if (!await _branchRepository.ExistsAsync(request.BranchId))
         {
@@ -313,8 +279,7 @@ public class OrderService : IOrderService
                 $"Customer '{request.CustomerId}' does not exist.");
         }
 
-        ValidateExpectedDeliveryDate(
-            request.ExpectedDeliveryDate);
+        ValidateExpectedDeliveryDate(request.ExpectedDeliveryDate);
 
         if (request.Items == null || !request.Items.Any())
         {
@@ -323,8 +288,7 @@ public class OrderService : IOrderService
         }
     }
 
-    private static void ValidateExpectedDeliveryDate(
-        DateTime expectedDeliveryDate)
+    private static void ValidateExpectedDeliveryDate(DateTime expectedDeliveryDate)
     {
         if (expectedDeliveryDate.Date < DateTime.Today)
         {
@@ -351,16 +315,13 @@ public class OrderService : IOrderService
             PaymentStatus = (int)order.PaymentStatus,
             BalanceAmount = order.BalanceAmount,
             Remarks = order.Remarks,
-
             Items = order.Items.Select(i => new OrderItemDto
             {
                 Id = i.Id,
                 ServiceCategoryId = i.ServiceCategoryId,
-                ServiceCategoryName =
-                    i.ServiceCategory?.Name ?? string.Empty,
+                ServiceCategoryName = i.ServiceCategory?.Name ?? string.Empty,
                 GarmentTypeId = i.GarmentTypeId,
-                GarmentTypeName =
-                    i.GarmentType?.Name ?? string.Empty,
+                GarmentTypeName = i.GarmentType?.Name ?? string.Empty,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
                 ExpressService = i.ExpressService,
@@ -378,11 +339,9 @@ public class OrderService : IOrderService
             Id = order.Id,
             OrderNumber = order.OrderNumber,
             CustomerId = order.CustomerId,
-
             CustomerName = order.Customer == null
                 ? string.Empty
                 : $"{order.Customer.FirstName} {order.Customer.LastName}".Trim(),
-
             OrderDate = order.OrderDate,
             ExpectedDeliveryDate = order.ExpectedDeliveryDate,
             Status = (int)order.Status,
@@ -406,8 +365,7 @@ public class OrderService : IOrderService
         if (order.Status != OrderStatus.Received)
         {
             throw new InvalidOrderStatusTransitionException(
-                $"Order '{orderId}' cannot be marked Ready from " +
-                $"status '{order.Status}'.");
+                $"Order '{orderId}' cannot be marked Ready from status '{order.Status}'.");
         }
 
         var previousStatus = order.Status;
@@ -429,7 +387,6 @@ public class OrderService : IOrderService
         };
 
         await _orderStatusHistoryRepository.AddAsync(history);
-
         await _orderRepository.SaveChangesAsync();
 
         return true;
