@@ -1,11 +1,11 @@
-﻿using Laundry.API.DTOs.Branch;
+using Laundry.API.DTOs.Branch;
 using Laundry.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laundry.API.Controllers;
 
-////[Authorize]
+[Authorize(Roles = "Super Admin")]
 [ApiController]
 [Route("api/[controller]")]
 public class BranchesController : ControllerBase
