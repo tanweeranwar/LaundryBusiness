@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Laundry.API.DTOs.Order;
 using Laundry.API.DTOs.Orders;
 using Laundry.API.Interfaces;
 using Laundry.API.Services.Interfaces;
@@ -15,20 +14,18 @@ public class OrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
     private readonly IOrderStatusHistoryService _orderStatusHistoryService;
+    private readonly IBranchAuthorizationService _branchAuthorization;
 
     public OrdersController(
         IOrderService orderService,
-        IOrderStatusHistoryService orderStatusHistoryService)
+        IOrderStatusHistoryService orderStatusHistoryService,
+        IBranchAuthorizationService branchAuthorization)
     {
         _orderService = orderService;
         _orderStatusHistoryService = orderStatusHistoryService;
+        _branchAuthorization = branchAuthorization;
     }
 
-    /// <summary>
-    /// Creates a new laundry order.
-    /// Customers can only create an order for themselves. Staff can create
-    /// orders for any customer.
-    /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(OrderDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -41,6 +38,10 @@ public class OrdersController : ControllerBase
 
             request.CustomerId = userId;
         }
+        else if (IsBranchScopedStaff() && request.BranchId != _branchAuthorization.CurrentBranchId)
+        {
+            return Forbid();
+        }
 
         var order = await _orderService.CreateAsync(request);
 
@@ -50,9 +51,6 @@ public class OrdersController : ControllerBase
             order);
     }
 
-    /// <summary>
-    /// Gets an order by Id. Customers may only access their own orders.
-    /// </summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -64,15 +62,12 @@ public class OrdersController : ControllerBase
         if (order == null)
             return NotFound();
 
-        if (!CanAccessCustomerResource(order.CustomerId))
+        if (!await CanAccessCustomerResourceAsync(order.CustomerId))
             return Forbid();
 
         return Ok(order);
     }
 
-    /// <summary>
-    /// Gets an order by order number. Customers may only access their own orders.
-    /// </summary>
     [HttpGet("number/{orderNumber}")]
     [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -84,16 +79,12 @@ public class OrdersController : ControllerBase
         if (order == null)
             return NotFound();
 
-        if (!CanAccessCustomerResource(order.CustomerId))
+        if (!await CanAccessCustomerResourceAsync(order.CustomerId))
             return Forbid();
 
         return Ok(order);
     }
 
-    /// <summary>
-    /// Gets all orders for a customer. Customer tokens are always restricted
-    /// to their own customer id, regardless of the route value supplied.
-    /// </summary>
     [HttpGet("customer/{customerId:guid}")]
     [ProducesResponseType(typeof(IEnumerable<OrderSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -106,7 +97,7 @@ public class OrdersController : ControllerBase
 
             customerId = userId;
         }
-        else if (!IsStaff())
+        else if (!await _branchAuthorization.CanAccessCustomerAsync(customerId))
         {
             return Forbid();
         }
@@ -115,31 +106,30 @@ public class OrdersController : ControllerBase
         return Ok(orders);
     }
 
-    /// <summary>
-    /// Gets all orders for a branch. This is an operational endpoint and is
-    /// restricted to staff. Branch-level scoping will be added once branch
-    /// ownership/assignment is persisted for staff accounts.
-    /// </summary>
     [HttpGet("branch/{branchId:int}")]
     [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
     [ProducesResponseType(typeof(IEnumerable<OrderSummaryDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<OrderSummaryDto>>> GetByBranch(int branchId)
     {
+        if (!_branchAuthorization.CanAccessBranch(branchId))
+            return Forbid();
+
         var orders = await _orderService.GetByBranchAsync(branchId);
         return Ok(orders);
     }
 
-    /// <summary>
-    /// Updates order status. Customers cannot change order state.
-    /// </summary>
     [HttpPut("{id:int}/status")]
     [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(
         int id,
         UpdateOrderDto request)
     {
+        if (!await _branchAuthorization.CanAccessOrderAsync(id))
+            return Forbid();
+
         var updated = await _orderService.UpdateStatusAsync(id, request);
 
         if (!updated)
@@ -148,13 +138,8 @@ public class OrdersController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>
-    /// Gets the status history of an order. Customers may only see their own history.
-    /// </summary>
     [HttpGet("{id:int}/status-history")]
-    [ProducesResponseType(
-        typeof(IEnumerable<OrderStatusHistoryDto>),
-        StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IEnumerable<OrderStatusHistoryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<OrderStatusHistoryDto>>> GetStatusHistory(int id)
@@ -164,7 +149,7 @@ public class OrdersController : ControllerBase
         if (order == null)
             return NotFound();
 
-        if (!CanAccessCustomerResource(order.CustomerId))
+        if (!await _branchAuthorization.CanAccessOrderAsync(id))
             return Forbid();
 
         var history = await _orderStatusHistoryService.GetByOrderIdAsync(id);
@@ -173,20 +158,18 @@ public class OrdersController : ControllerBase
 
     private bool IsCustomer() => User.IsInRole("Customer");
 
-    private bool IsStaff() =>
-        User.IsInRole("Super Admin") ||
+    private bool IsBranchScopedStaff() =>
         User.IsInRole("Branch Admin") ||
         User.IsInRole("Employee");
 
-    private bool CanAccessCustomerResource(Guid customerId)
+    private async Task<bool> CanAccessCustomerResourceAsync(Guid customerId)
     {
-        if (IsStaff())
-            return true;
+        if (User.IsInRole("Customer"))
+        {
+            return TryGetCurrentUserId(out var userId) && userId == customerId;
+        }
 
-        if (!IsCustomer())
-            return false;
-
-        return TryGetCurrentUserId(out var userId) && userId == customerId;
+        return await _branchAuthorization.CanAccessCustomerAsync(customerId);
     }
 
     private bool TryGetCurrentUserId(out Guid userId)
