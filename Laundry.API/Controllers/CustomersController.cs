@@ -14,50 +14,63 @@ public class CustomersController : ControllerBase
     private const string StaffRoles = "Super Admin,Branch Admin,Employee";
 
     private readonly ICustomerService _customerService;
+    private readonly IBranchAuthorizationService _branchAuthorization;
 
-    public CustomersController(ICustomerService customerService)
+    public CustomersController(
+        ICustomerService customerService,
+        IBranchAuthorizationService branchAuthorization)
     {
         _customerService = customerService;
+        _branchAuthorization = branchAuthorization;
     }
 
-    /// <summary>
-    /// Creates a new customer. Customer self-registration is handled by /api/auth/register.
-    /// This endpoint is restricted to staff to prevent arbitrary customer creation through
-    /// an authenticated customer token.
-    /// </summary>
     [HttpPost]
     [Authorize(Roles = StaffRoles)]
-    [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CustomerResponse>> Create(CreateCustomerRequest request)
     {
+        if (_branchAuthorization.IsBranchScopedStaff)
+        {
+            if (!_branchAuthorization.CurrentBranchId.HasValue)
+                return Forbid();
+
+            request.BranchId = _branchAuthorization.CurrentBranchId.Value;
+        }
+
         var customer = await _customerService.CreateAsync(request);
         return Ok(customer);
     }
 
-    /// <summary>
-    /// Gets all customers. Customer accounts cannot enumerate other customers.
-    /// </summary>
     [HttpGet]
     [Authorize(Roles = StaffRoles)]
-    [ProducesResponseType(typeof(IEnumerable<CustomerResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CustomerResponse>>> GetAll()
     {
         var customers = await _customerService.GetAllAsync();
-        return Ok(customers);
+
+        if (_branchAuthorization.IsSuperAdmin)
+            return Ok(customers);
+
+        var scoped = new List<CustomerResponse>();
+        foreach (var customer in customers)
+        {
+            if (await _branchAuthorization.CanAccessCustomerAsync(customer.Id))
+                scoped.Add(customer);
+        }
+
+        return Ok(scoped);
     }
 
-    /// <summary>
-    /// Gets a customer by Id. Customers may only access their own profile.
-    /// </summary>
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CustomerResponse>> GetById(Guid id)
     {
-        if (!IsStaff() && !IsCurrentUser(id))
+        if (User.IsInRole("Customer"))
+        {
+            if (!IsCurrentUser(id))
+                return Forbid();
+        }
+        else if (!await _branchAuthorization.CanAccessCustomerAsync(id))
+        {
             return Forbid();
+        }
 
         var customer = await _customerService.GetByIdAsync(id);
 
@@ -67,19 +80,20 @@ public class CustomersController : ControllerBase
         return Ok(customer);
     }
 
-    /// <summary>
-    /// Updates a customer. Customers may only update their own profile.
-    /// </summary>
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(
         Guid id,
         UpdateCustomerRequest request)
     {
-        if (!IsStaff() && !IsCurrentUser(id))
+        if (User.IsInRole("Customer"))
+        {
+            if (!IsCurrentUser(id))
+                return Forbid();
+        }
+        else if (!await _branchAuthorization.CanAccessCustomerAsync(id))
+        {
             return Forbid();
+        }
 
         var updated = await _customerService.UpdateAsync(id, request);
 
@@ -89,17 +103,18 @@ public class CustomersController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>
-    /// Deletes a customer. Customers may only delete their own profile.
-    /// </summary>
     [HttpDelete("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        if (!IsStaff() && !IsCurrentUser(id))
+        if (User.IsInRole("Customer"))
+        {
+            if (!IsCurrentUser(id))
+                return Forbid();
+        }
+        else if (!await _branchAuthorization.CanAccessCustomerAsync(id))
+        {
             return Forbid();
+        }
 
         var deleted = await _customerService.DeleteAsync(id);
 
@@ -107,13 +122,6 @@ public class CustomersController : ControllerBase
             return NotFound();
 
         return NoContent();
-    }
-
-    private bool IsStaff()
-    {
-        return User.IsInRole("Super Admin") ||
-               User.IsInRole("Branch Admin") ||
-               User.IsInRole("Employee");
     }
 
     private bool IsCurrentUser(Guid customerId)
