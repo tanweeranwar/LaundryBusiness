@@ -1,4 +1,4 @@
-﻿using BCrypt.Net;
+using BCrypt.Net;
 using Laundry.API.Data;
 using Laundry.API.DTOs.Authentication;
 using Laundry.API.Entities;
@@ -39,7 +39,8 @@ public class AuthenticationController : ControllerBase
             MobileNumber = request.MobileNumber,
             Email = request.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role = "Customer"
+            Role = "Customer",
+            BranchId = null
         };
 
         _context.Customers.Add(customer);
@@ -70,7 +71,8 @@ public class AuthenticationController : ControllerBase
         var token = jwtService.GenerateToken(
             customer.Id,
             customer.MobileNumber,
-            customer.Role);
+            customer.Role,
+            customer.BranchId);
 
         return Ok(new LoginResponse
         {
