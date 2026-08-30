@@ -51,6 +51,14 @@ public class BranchAuthorizationService : IBranchAuthorizationService
 
     public async Task<bool> CanAccessCustomerAsync(Guid customerId)
     {
+        var customer = await _context.Customers
+            .AsNoTracking()
+            .Select(x => new { x.Id, x.BranchId })
+            .FirstOrDefaultAsync(x => x.Id == customerId);
+
+        if (customer == null)
+            return false;
+
         if (IsSuperAdmin)
             return true;
 
@@ -62,6 +70,9 @@ public class BranchAuthorizationService : IBranchAuthorizationService
 
         if (!IsBranchScopedStaff || !CurrentBranchId.HasValue)
             return false;
+
+        if (customer.BranchId == CurrentBranchId.Value)
+            return true;
 
         return await _context.Orders
             .AsNoTracking()
