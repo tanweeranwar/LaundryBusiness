@@ -1,5 +1,6 @@
 using Laundry.API.DTOs.BranchPricing;
 using Laundry.API.Interfaces;
+using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
