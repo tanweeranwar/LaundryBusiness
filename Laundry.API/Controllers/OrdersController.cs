@@ -38,9 +38,13 @@ public class OrdersController : ControllerBase
 
             request.CustomerId = userId;
         }
-        else if (IsBranchScopedStaff() && request.BranchId != _branchAuthorization.CurrentBranchId)
+        else if (IsBranchScopedStaff())
         {
-            return Forbid();
+            if (request.BranchId != _branchAuthorization.CurrentBranchId ||
+                !await _branchAuthorization.CanAccessCustomerAsync(request.CustomerId))
+            {
+                return Forbid();
+            }
         }
 
         var order = await _orderService.CreateAsync(request);
@@ -52,9 +56,6 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OrderDto>> GetById(int id)
     {
         var order = await _orderService.GetByIdAsync(id);
@@ -69,9 +70,6 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("number/{orderNumber}")]
-    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OrderDto>> GetByOrderNumber(string orderNumber)
     {
         var order = await _orderService.GetByOrderNumberAsync(orderNumber);
@@ -86,8 +84,6 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("customer/{customerId:guid}")]
-    [ProducesResponseType(typeof(IEnumerable<OrderSummaryDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IEnumerable<OrderSummaryDto>>> GetByCustomer(Guid customerId)
     {
         if (IsCustomer())
@@ -108,7 +104,6 @@ public class OrdersController : ControllerBase
 
     [HttpGet("branch/{branchId:int}")]
     [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
-    [ProducesResponseType(typeof(IEnumerable<OrderSummaryDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<OrderSummaryDto>>> GetByBranch(int branchId)
     {
         if (!_branchAuthorization.CanAccessBranch(branchId))
@@ -120,9 +115,6 @@ public class OrdersController : ControllerBase
 
     [HttpPut("{id:int}/status")]
     [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(
         int id,
         UpdateOrderDto request)
@@ -139,9 +131,6 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("{id:int}/status-history")]
-    [ProducesResponseType(typeof(IEnumerable<OrderStatusHistoryDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<OrderStatusHistoryDto>>> GetStatusHistory(int id)
     {
         var order = await _orderService.GetByIdAsync(id);
@@ -165,9 +154,7 @@ public class OrdersController : ControllerBase
     private async Task<bool> CanAccessCustomerResourceAsync(Guid customerId)
     {
         if (User.IsInRole("Customer"))
-        {
             return TryGetCurrentUserId(out var userId) && userId == customerId;
-        }
 
         return await _branchAuthorization.CanAccessCustomerAsync(customerId);
     }
