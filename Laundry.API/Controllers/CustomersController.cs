@@ -60,6 +60,7 @@ public class CustomersController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<CustomerResponse>> GetById(Guid id)
     {
         if (User.IsInRole("Customer"))
@@ -81,6 +82,7 @@ public class CustomersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<IActionResult> Update(
         Guid id,
         UpdateCustomerRequest request)
@@ -104,6 +106,7 @@ public class CustomersController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<IActionResult> Delete(Guid id)
     {
         if (User.IsInRole("Customer"))
