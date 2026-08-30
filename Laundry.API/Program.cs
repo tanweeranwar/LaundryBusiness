@@ -34,7 +34,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
-
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -44,8 +44,9 @@ builder.Services.AddDbContext<LaundryDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("LaundryDb")));
 
-// Authentication
+// Authentication / authorization
 builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<IBranchAuthorizationService, BranchAuthorizationService>();
 
 // Branch
 builder.Services.AddScoped<IBranchRepository, BranchRepository>();
