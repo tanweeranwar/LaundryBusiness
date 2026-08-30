@@ -14,19 +14,31 @@ public class JwtService : IJwtService
         _configuration = configuration;
     }
 
-    public string GenerateToken(Guid customerId, string mobileNumber, string role)
+    public string GenerateToken(
+        Guid customerId,
+        string mobileNumber,
+        string role,
+        int? branchId = null)
     {
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, customerId.ToString()),
-            new Claim(ClaimTypes.MobilePhone, mobileNumber),
-            new Claim(ClaimTypes.Role, role)
+            new(JwtRegisteredClaimNames.Sub, customerId.ToString()),
+            new(ClaimTypes.NameIdentifier, customerId.ToString()),
+            new(ClaimTypes.MobilePhone, mobileNumber),
+            new(ClaimTypes.Role, role)
         };
+
+        if (branchId.HasValue)
+        {
+            claims.Add(new Claim("branch_id", branchId.Value.ToString()));
+        }
 
         var key = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
 
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var credentials = new SigningCredentials(
+            key,
+            SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
             issuer: _configuration["Jwt:Issuer"],
