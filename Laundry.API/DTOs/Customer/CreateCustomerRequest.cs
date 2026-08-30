@@ -22,4 +22,6 @@ public class CreateCustomerRequest
     [EmailAddress]
     [MaxLength(200)]
     public string Email { get; set; } = string.Empty;
+
+    public int? BranchId { get; set; }
 }
