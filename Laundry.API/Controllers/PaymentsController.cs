@@ -13,26 +13,25 @@ public class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
     private readonly IOrderService _orderService;
+    private readonly IBranchAuthorizationService _branchAuthorization;
 
     public PaymentsController(
         IPaymentService paymentService,
-        IOrderService orderService)
+        IOrderService orderService,
+        IBranchAuthorizationService branchAuthorization)
     {
         _paymentService = paymentService;
         _orderService = orderService;
+        _branchAuthorization = branchAuthorization;
     }
 
-    /// <summary>
-    /// Records a payment against an order. Payment recording is restricted to staff.
-    /// Customer-facing online payment integration should create payments through a
-    /// trusted payment workflow rather than accepting arbitrary payment records.
-    /// </summary>
     [HttpPost]
     [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
-    [ProducesResponseType(typeof(PaymentDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PaymentDto>> Create(CreatePaymentDto request)
     {
+        if (!await _branchAuthorization.CanAccessOrderAsync(request.OrderId))
+            return Forbid();
+
         var payment = await _paymentService.CreateAsync(request);
 
         return CreatedAtAction(
@@ -41,13 +40,7 @@ public class PaymentsController : ControllerBase
             payment);
     }
 
-    /// <summary>
-    /// Gets a payment by Id. Customers may only access payments belonging to their orders.
-    /// </summary>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(PaymentDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PaymentDto>> GetById(int id)
     {
         var payment = await _paymentService.GetByIdAsync(id);
@@ -55,76 +48,48 @@ public class PaymentsController : ControllerBase
         if (payment == null)
             return NotFound();
 
-        if (!await CanAccessOrderAsync(payment.OrderId))
+        if (!await _branchAuthorization.CanAccessPaymentAsync(id))
             return Forbid();
 
         return Ok(payment);
     }
 
-    /// <summary>
-    /// Gets all payments for an order. Customer tokens are restricted to their own order.
-    /// </summary>
     [HttpGet("order/{orderId:int}")]
-    [ProducesResponseType(typeof(IEnumerable<PaymentDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IEnumerable<PaymentDto>>> GetByOrder(int orderId)
     {
-        if (User.IsInRole("Customer"))
-        {
-            if (!TryGetCurrentUserId(out var userId))
-                return Unauthorized();
-
-            var order = await _orderService.GetByIdAsync(orderId);
-
-            if (order == null)
-                return NotFound();
-
-            if (order.CustomerId != userId)
-                return Forbid();
-        }
-        else if (!IsStaff())
-        {
+        if (!await _branchAuthorization.CanAccessOrderAsync(orderId))
             return Forbid();
-        }
 
         var payments = await _paymentService.GetByOrderIdAsync(orderId);
         return Ok(payments);
     }
 
-    /// <summary>
-    /// Updates payment details. Restricted to staff.
-    /// </summary>
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
-    [ProducesResponseType(typeof(PaymentDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PaymentDto>> Update(
         int id,
         UpdatePaymentDto request)
     {
+        if (!await _branchAuthorization.CanAccessPaymentAsync(id))
+            return Forbid();
+
         var payment = await _paymentService.UpdateAsync(id, request);
         return Ok(payment);
     }
 
     private async Task<bool> CanAccessOrderAsync(int orderId)
     {
-        if (IsStaff())
-            return true;
+        if (User.IsInRole("Customer"))
+        {
+            if (!TryGetCurrentUserId(out var userId))
+                return false;
 
-        if (!User.IsInRole("Customer"))
-            return false;
+            var order = await _orderService.GetByIdAsync(orderId);
+            return order?.CustomerId == userId;
+        }
 
-        if (!TryGetCurrentUserId(out var userId))
-            return false;
-
-        var order = await _orderService.GetByIdAsync(orderId);
-        return order?.CustomerId == userId;
+        return await _branchAuthorization.CanAccessOrderAsync(orderId);
     }
-
-    private bool IsStaff() =>
-        User.IsInRole("Super Admin") ||
-        User.IsInRole("Branch Admin") ||
-        User.IsInRole("Employee");
 
     private bool TryGetCurrentUserId(out Guid userId)
     {
