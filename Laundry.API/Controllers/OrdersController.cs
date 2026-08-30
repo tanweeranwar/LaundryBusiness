@@ -27,8 +27,6 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<OrderDto>> Create(CreateOrderDto request)
     {
         if (IsCustomer())
@@ -56,6 +54,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<OrderDto>> GetById(int id)
     {
         var order = await _orderService.GetByIdAsync(id);
@@ -70,6 +69,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("number/{orderNumber}")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<OrderDto>> GetByOrderNumber(string orderNumber)
     {
         var order = await _orderService.GetByOrderNumberAsync(orderNumber);
@@ -84,6 +84,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("customer/{customerId:guid}")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<IEnumerable<OrderSummaryDto>>> GetByCustomer(Guid customerId)
     {
         if (IsCustomer())
@@ -131,6 +132,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("{id:int}/status-history")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<IEnumerable<OrderStatusHistoryDto>>> GetStatusHistory(int id)
     {
         var order = await _orderService.GetByIdAsync(id);
