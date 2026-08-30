@@ -2,5 +2,9 @@
 
 public interface IJwtService
 {
-    string GenerateToken(Guid customerId, string mobileNumber, string role);
+    string GenerateToken(
+        Guid customerId,
+        string mobileNumber,
+        string role,
+        int? branchId = null);
 }
