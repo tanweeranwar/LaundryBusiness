@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Laundry.API.DTOs.Payment;
 using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -12,16 +11,13 @@ namespace Laundry.API.Controllers;
 public class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
-    private readonly IOrderService _orderService;
     private readonly IBranchAuthorizationService _branchAuthorization;
 
     public PaymentsController(
         IPaymentService paymentService,
-        IOrderService orderService,
         IBranchAuthorizationService branchAuthorization)
     {
         _paymentService = paymentService;
-        _orderService = orderService;
         _branchAuthorization = branchAuthorization;
     }
 
@@ -41,6 +37,7 @@ public class PaymentsController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<PaymentDto>> GetById(int id)
     {
         var payment = await _paymentService.GetByIdAsync(id);
@@ -55,6 +52,7 @@ public class PaymentsController : ControllerBase
     }
 
     [HttpGet("order/{orderId:int}")]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<IEnumerable<PaymentDto>>> GetByOrder(int orderId)
     {
         if (!await _branchAuthorization.CanAccessOrderAsync(orderId))
@@ -75,27 +73,5 @@ public class PaymentsController : ControllerBase
 
         var payment = await _paymentService.UpdateAsync(id, request);
         return Ok(payment);
-    }
-
-    private async Task<bool> CanAccessOrderAsync(int orderId)
-    {
-        if (User.IsInRole("Customer"))
-        {
-            if (!TryGetCurrentUserId(out var userId))
-                return false;
-
-            var order = await _orderService.GetByIdAsync(orderId);
-            return order?.CustomerId == userId;
-        }
-
-        return await _branchAuthorization.CanAccessOrderAsync(orderId);
-    }
-
-    private bool TryGetCurrentUserId(out Guid userId)
-    {
-        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                    ?? User.FindFirstValue("sub");
-
-        return Guid.TryParse(claim, out userId);
     }
 }
