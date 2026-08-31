@@ -2,13 +2,14 @@ using BCrypt.Net;
 using Laundry.API.Data;
 using Laundry.API.DTOs.Staff;
 using Laundry.API.Entities;
+using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Laundry.API.Controllers;
 
-[Authorize(Roles = "Super Admin")]
+[Authorize(Roles = "Super Admin,Branch Admin")]
 [ApiController]
 [Route("api/[controller]")]
 public class StaffController : ControllerBase
@@ -23,18 +24,33 @@ public class StaffController : ControllerBase
         };
 
     private readonly LaundryDbContext _context;
+    private readonly IBranchAuthorizationService _branchAuthorization;
 
-    public StaffController(LaundryDbContext context)
+    public StaffController(
+        LaundryDbContext context,
+        IBranchAuthorizationService branchAuthorization)
     {
         _context = context;
+        _branchAuthorization = branchAuthorization;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<StaffResponse>>> GetAll()
     {
-        var staff = await _context.Customers
+        var query = _context.Customers
             .AsNoTracking()
-            .Where(x => x.Role != "Customer")
+            .Where(x => x.Role != "Customer");
+
+        if (!_branchAuthorization.IsSuperAdmin)
+        {
+            if (!_branchAuthorization.CurrentBranchId.HasValue)
+                return Forbid();
+
+            var branchId = _branchAuthorization.CurrentBranchId.Value;
+            query = query.Where(x => x.BranchId == branchId);
+        }
+
+        var staff = await query
             .OrderBy(x => x.LastName)
             .ThenBy(x => x.FirstName)
             .Select(x => new StaffResponse
@@ -58,11 +74,29 @@ public class StaffController : ControllerBase
         if (!AllowedRoles.Contains(request.Role))
             return BadRequest("Invalid staff role.");
 
-        if (request.Role != "Super Admin" && !request.BranchId.HasValue)
-            return BadRequest("BranchId is required for branch-scoped staff.");
+        if (_branchAuthorization.IsSuperAdmin)
+        {
+            if (request.Role == "Super Admin")
+            {
+                request.BranchId = null;
+            }
+            else if (!request.BranchId.HasValue)
+            {
+                return BadRequest("BranchId is required for branch-scoped staff.");
+            }
+        }
+        else
+        {
+            if (!_branchAuthorization.CurrentBranchId.HasValue)
+                return Forbid();
 
-        if (request.Role == "Super Admin")
-            request.BranchId = null;
+            // Branch Admins may manage operational staff in their own branch,
+            // but cannot create privileged users or assign another branch.
+            if (request.Role is "Super Admin" or "Branch Admin")
+                return Forbid();
+
+            request.BranchId = _branchAuthorization.CurrentBranchId.Value;
+        }
 
         if (request.BranchId.HasValue &&
             !await _context.Branches.AnyAsync(x => x.Id == request.BranchId.Value))
