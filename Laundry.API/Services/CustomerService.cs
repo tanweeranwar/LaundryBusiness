@@ -15,8 +15,7 @@ public class CustomerService : ICustomerService
         _customerRepository = customerRepository;
     }
 
-    public async Task<CustomerResponse> CreateAsync(
-    CreateCustomerRequest request)
+    public async Task<CustomerResponse> CreateAsync(CreateCustomerRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -37,7 +36,9 @@ public class CustomerService : ICustomerService
             FirstName = request.FirstName.Trim(),
             LastName = request.LastName.Trim(),
             MobileNumber = mobileNumber,
-            Email = email
+            Email = email,
+            BranchId = request.BranchId,
+            Role = "Customer"
         };
 
         await _customerRepository.AddAsync(customer);
@@ -48,10 +49,7 @@ public class CustomerService : ICustomerService
 
     public async Task<IEnumerable<CustomerResponse>> GetAllAsync()
     {
-        // GetAll will be added to the repository in the next step.
-        var customers =
-            await _customerRepository.GetAllAsync();
-
+        var customers = await _customerRepository.GetAllAsync();
         return customers.Select(Map).ToList();
     }
 
@@ -62,15 +60,13 @@ public class CustomerService : ICustomerService
                 "Customer Id is invalid.",
                 nameof(id));
 
-        var customer =
-            await _customerRepository.GetByIdAsync(id);
-
+        var customer = await _customerRepository.GetByIdAsync(id);
         return customer == null ? null : Map(customer);
     }
 
     public async Task<bool> UpdateAsync(
-    Guid id,
-    UpdateCustomerRequest request)
+        Guid id,
+        UpdateCustomerRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -79,8 +75,7 @@ public class CustomerService : ICustomerService
                 "Customer Id is invalid.",
                 nameof(id));
 
-        var customer =
-            await _customerRepository.GetByIdAsync(id);
+        var customer = await _customerRepository.GetByIdAsync(id);
 
         if (customer == null)
             return false;
@@ -88,17 +83,13 @@ public class CustomerService : ICustomerService
         var mobileNumber = request.MobileNumber.Trim();
         var email = request.Email.Trim();
 
-        if (await _customerRepository.ExistsByMobileNumberAsync(
-                mobileNumber,
-                id))
+        if (await _customerRepository.ExistsByMobileNumberAsync(mobileNumber, id))
         {
             throw new DuplicateCustomerException(
                 "A customer with this mobile number already exists.");
         }
 
-        if (await _customerRepository.ExistsByEmailAsync(
-                email,
-                id))
+        if (await _customerRepository.ExistsByEmailAsync(email, id))
         {
             throw new DuplicateCustomerException(
                 "A customer with this email already exists.");
@@ -123,8 +114,7 @@ public class CustomerService : ICustomerService
                 "Customer Id is invalid.",
                 nameof(id));
 
-        var customer =
-            await _customerRepository.GetByIdAsync(id);
+        var customer = await _customerRepository.GetByIdAsync(id);
 
         if (customer == null)
             return false;

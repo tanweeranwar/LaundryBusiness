@@ -1,4 +1,4 @@
-﻿using Laundry.API.DTOs.Delivery;
+using Laundry.API.DTOs.Delivery;
 using Laundry.API.Enums;
 using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -12,17 +12,23 @@ namespace Laundry.API.Controllers;
 public class DeliveriesController : ControllerBase
 {
     private readonly IDeliveryService _deliveryService;
+    private readonly IBranchAuthorizationService _branchAuthorization;
 
-    public DeliveriesController(IDeliveryService deliveryService)
+    public DeliveriesController(
+        IDeliveryService deliveryService,
+        IBranchAuthorizationService branchAuthorization)
     {
         _deliveryService = deliveryService;
+        _branchAuthorization = branchAuthorization;
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(DeliveryDto), StatusCodes.Status201Created)]
-    public async Task<ActionResult<DeliveryDto>> Create(
-        CreateDeliveryDto request)
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
+    public async Task<ActionResult<DeliveryDto>> Create(CreateDeliveryDto request)
     {
+        if (!await _branchAuthorization.CanAccessOrderAsync(request.OrderId))
+            return Forbid();
+
         var delivery = await _deliveryService.CreateAsync(request);
 
         return CreatedAtAction(
@@ -32,8 +38,6 @@ public class DeliveriesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(DeliveryDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<DeliveryDto>> GetById(int id)
     {
         var delivery = await _deliveryService.GetByIdAsync(id);
@@ -41,16 +45,19 @@ public class DeliveriesController : ControllerBase
         if (delivery == null)
             return NotFound();
 
+        if (!await _branchAuthorization.CanAccessDeliveryAsync(id))
+            return Forbid();
+
         return Ok(delivery);
     }
 
     [HttpGet("order/{orderId:int}")]
-    [ProducesResponseType(typeof(DeliveryDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<DeliveryDto>> GetByOrderId(int orderId)
     {
-        var delivery =
-            await _deliveryService.GetByOrderIdAsync(orderId);
+        if (!await _branchAuthorization.CanAccessOrderAsync(orderId))
+            return Forbid();
+
+        var delivery = await _deliveryService.GetByOrderIdAsync(orderId);
 
         if (delivery == null)
             return NotFound();
@@ -59,28 +66,36 @@ public class DeliveriesController : ControllerBase
     }
 
     [HttpGet("status/{status}")]
-    [ProducesResponseType(typeof(IEnumerable<DeliveryDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<DeliveryDto>>> GetByStatus(
-        DeliveryStatus status)
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee,Delivery Agent")]
+    public async Task<ActionResult<IEnumerable<DeliveryDto>>> GetByStatus(DeliveryStatus status)
     {
-        var deliveries =
-            await _deliveryService.GetByStatusAsync(status);
+        var deliveries = await _deliveryService.GetByStatusAsync(status);
 
-        return Ok(deliveries);
+        if (_branchAuthorization.IsSuperAdmin)
+            return Ok(deliveries);
+
+        var scoped = new List<DeliveryDto>();
+        foreach (var delivery in deliveries)
+        {
+            if (await _branchAuthorization.CanAccessOrderAsync(delivery.OrderId))
+                scoped.Add(delivery);
+        }
+
+        return Ok(scoped);
     }
 
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(DeliveryDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee,Delivery Agent")]
     public async Task<ActionResult<DeliveryDto>> Update(
         int id,
         UpdateDeliveryDto request)
     {
+        if (!await _branchAuthorization.CanAccessDeliveryAsync(id))
+            return Forbid();
+
         try
         {
-            var delivery =
-                await _deliveryService.UpdateAsync(id, request);
-
+            var delivery = await _deliveryService.UpdateAsync(id, request);
             return Ok(delivery);
         }
         catch (KeyNotFoundException)

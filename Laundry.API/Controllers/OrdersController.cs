@@ -1,8 +1,7 @@
-﻿//using Laundry.API.DTOs.Order;
+using System.Security.Claims;
 using Laundry.API.DTOs.Order;
 using Laundry.API.DTOs.Orders;
 using Laundry.API.Interfaces;
-using Laundry.API.Services;
 using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,23 +15,37 @@ public class OrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
     private readonly IOrderStatusHistoryService _orderStatusHistoryService;
+    private readonly IBranchAuthorizationService _branchAuthorization;
 
     public OrdersController(
-    IOrderService orderService,
-    IOrderStatusHistoryService orderStatusHistoryService)
+        IOrderService orderService,
+        IOrderStatusHistoryService orderStatusHistoryService,
+        IBranchAuthorizationService branchAuthorization)
     {
         _orderService = orderService;
         _orderStatusHistoryService = orderStatusHistoryService;
+        _branchAuthorization = branchAuthorization;
     }
 
-    /// <summary>
-    /// Creates a new laundry order.
-    /// </summary>
     [HttpPost]
-    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<OrderDto>> Create(CreateOrderDto request)
     {
+        if (IsCustomer())
+        {
+            if (!TryGetCurrentUserId(out var userId))
+                return Unauthorized();
+
+            request.CustomerId = userId;
+        }
+        else if (IsBranchScopedStaff())
+        {
+            if (request.BranchId != _branchAuthorization.CurrentBranchId ||
+                !await _branchAuthorization.CanAccessCustomerAsync(request.CustomerId))
+            {
+                return Forbid();
+            }
+        }
+
         var order = await _orderService.CreateAsync(request);
 
         return CreatedAtAction(
@@ -41,12 +54,8 @@ public class OrdersController : ControllerBase
             order);
     }
 
-    /// <summary>
-    /// Gets an order by Id.
-    /// </summary>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<OrderDto>> GetById(int id)
     {
         var order = await _orderService.GetByIdAsync(id);
@@ -54,15 +63,14 @@ public class OrdersController : ControllerBase
         if (order == null)
             return NotFound();
 
+        if (!await CanAccessCustomerResourceAsync(order.CustomerId))
+            return Forbid();
+
         return Ok(order);
     }
 
-    /// <summary>
-    /// Gets an order by order number.
-    /// </summary>
     [HttpGet("number/{orderNumber}")]
-    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<OrderDto>> GetByOrderNumber(string orderNumber)
     {
         var order = await _orderService.GetByOrderNumberAsync(orderNumber);
@@ -70,43 +78,52 @@ public class OrdersController : ControllerBase
         if (order == null)
             return NotFound();
 
+        if (!await CanAccessCustomerResourceAsync(order.CustomerId))
+            return Forbid();
+
         return Ok(order);
     }
 
-    /// <summary>
-    /// Gets all orders for a customer.
-    /// </summary>
     [HttpGet("customer/{customerId:guid}")]
-    [ProducesResponseType(typeof(IEnumerable<OrderSummaryDto>), StatusCodes.Status200OK)]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<IEnumerable<OrderSummaryDto>>> GetByCustomer(Guid customerId)
     {
-        var orders = await _orderService.GetByCustomerAsync(customerId);
+        if (IsCustomer())
+        {
+            if (!TryGetCurrentUserId(out var userId))
+                return Unauthorized();
 
+            customerId = userId;
+        }
+        else if (!await _branchAuthorization.CanAccessCustomerAsync(customerId))
+        {
+            return Forbid();
+        }
+
+        var orders = await _orderService.GetByCustomerAsync(customerId);
         return Ok(orders);
     }
 
-    /// <summary>
-    /// Gets all orders for a branch.
-    /// </summary>
     [HttpGet("branch/{branchId:int}")]
-    [ProducesResponseType(typeof(IEnumerable<OrderSummaryDto>), StatusCodes.Status200OK)]
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<IEnumerable<OrderSummaryDto>>> GetByBranch(int branchId)
     {
-        var orders = await _orderService.GetByBranchAsync(branchId);
+        if (!_branchAuthorization.CanAccessBranch(branchId))
+            return Forbid();
 
+        var orders = await _orderService.GetByBranchAsync(branchId);
         return Ok(orders);
     }
 
-    /// <summary>
-    /// Updates order status.
-    /// </summary>
     [HttpPut("{id:int}/status")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
     public async Task<IActionResult> UpdateStatus(
         int id,
         UpdateOrderDto request)
     {
+        if (!await _branchAuthorization.CanAccessOrderAsync(id))
+            return Forbid();
+
         var updated = await _orderService.UpdateStatusAsync(id, request);
 
         if (!updated)
@@ -115,25 +132,41 @@ public class OrdersController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>
-    /// Gets the status history of an order.
-    /// </summary>
     [HttpGet("{id:int}/status-history")]
-    [ProducesResponseType(
-        typeof(IEnumerable<OrderStatusHistoryDto>),
-        StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<IEnumerable<OrderStatusHistoryDto>>>
-        GetStatusHistory(int id)
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
+    public async Task<ActionResult<IEnumerable<OrderStatusHistoryDto>>> GetStatusHistory(int id)
     {
         var order = await _orderService.GetByIdAsync(id);
 
         if (order == null)
             return NotFound();
 
-        var history =
-            await _orderStatusHistoryService.GetByOrderIdAsync(id);
+        if (!await _branchAuthorization.CanAccessOrderAsync(id))
+            return Forbid();
 
+        var history = await _orderStatusHistoryService.GetByOrderIdAsync(id);
         return Ok(history);
+    }
+
+    private bool IsCustomer() => User.IsInRole("Customer");
+
+    private bool IsBranchScopedStaff() =>
+        User.IsInRole("Branch Admin") ||
+        User.IsInRole("Employee");
+
+    private async Task<bool> CanAccessCustomerResourceAsync(Guid customerId)
+    {
+        if (User.IsInRole("Customer"))
+            return TryGetCurrentUserId(out var userId) && userId == customerId;
+
+        return await _branchAuthorization.CanAccessCustomerAsync(customerId);
+    }
+
+    private bool TryGetCurrentUserId(out Guid userId)
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue("sub");
+
+        return Guid.TryParse(claim, out userId);
     }
 }

@@ -1,4 +1,5 @@
-﻿using Laundry.API.DTOs.Customer;
+using System.Security.Claims;
+using Laundry.API.DTOs.Customer;
 using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,57 +11,69 @@ namespace Laundry.API.Controllers;
 [Authorize]
 public class CustomersController : ControllerBase
 {
-    private readonly ICustomerService _customerService;
+    private const string StaffRoles = "Super Admin,Branch Admin,Employee";
 
-    public CustomersController(ICustomerService customerService)
+    private readonly ICustomerService _customerService;
+    private readonly IBranchAuthorizationService _branchAuthorization;
+
+    public CustomersController(
+        ICustomerService customerService,
+        IBranchAuthorizationService branchAuthorization)
     {
         _customerService = customerService;
+        _branchAuthorization = branchAuthorization;
     }
 
-    /// <summary>
-    /// Creates a new customer.
-    /// </summary>
     [HttpPost]
-    [ProducesResponseType(
-        typeof(CustomerResponse),
-        StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<CustomerResponse>> Create(
-        CreateCustomerRequest request)
+    [Authorize(Roles = StaffRoles)]
+    public async Task<ActionResult<CustomerResponse>> Create(CreateCustomerRequest request)
     {
-        var customer =
-            await _customerService.CreateAsync(request);
+        if (_branchAuthorization.IsBranchScopedStaff)
+        {
+            if (!_branchAuthorization.CurrentBranchId.HasValue)
+                return Forbid();
 
+            request.BranchId = _branchAuthorization.CurrentBranchId.Value;
+        }
+
+        var customer = await _customerService.CreateAsync(request);
         return Ok(customer);
     }
 
-    /// <summary>
-    /// Gets all customers.
-    /// </summary>
     [HttpGet]
-    [ProducesResponseType(
-        typeof(IEnumerable<CustomerResponse>),
-        StatusCodes.Status200OK)]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<IEnumerable<CustomerResponse>>> GetAll()
     {
-        var customers =
-            await _customerService.GetAllAsync();
+        var customers = await _customerService.GetAllAsync();
 
-        return Ok(customers);
+        if (_branchAuthorization.IsSuperAdmin)
+            return Ok(customers);
+
+        var scoped = new List<CustomerResponse>();
+        foreach (var customer in customers)
+        {
+            if (await _branchAuthorization.CanAccessCustomerAsync(customer.Id))
+                scoped.Add(customer);
+        }
+
+        return Ok(scoped);
     }
 
-    /// <summary>
-    /// Gets a customer by Id.
-    /// </summary>
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(
-        typeof(CustomerResponse),
-        StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<CustomerResponse>> GetById(Guid id)
     {
-        var customer =
-            await _customerService.GetByIdAsync(id);
+        if (User.IsInRole("Customer"))
+        {
+            if (!IsCurrentUser(id))
+                return Forbid();
+        }
+        else if (!await _branchAuthorization.CanAccessCustomerAsync(id))
+        {
+            return Forbid();
+        }
+
+        var customer = await _customerService.GetByIdAsync(id);
 
         if (customer == null)
             return NotFound();
@@ -68,18 +81,23 @@ public class CustomersController : ControllerBase
         return Ok(customer);
     }
 
-    /// <summary>
-    /// Updates an existing customer.
-    /// </summary>
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<IActionResult> Update(
         Guid id,
         UpdateCustomerRequest request)
     {
-        var updated =
-            await _customerService.UpdateAsync(id, request);
+        if (User.IsInRole("Customer"))
+        {
+            if (!IsCurrentUser(id))
+                return Forbid();
+        }
+        else if (!await _branchAuthorization.CanAccessCustomerAsync(id))
+        {
+            return Forbid();
+        }
+
+        var updated = await _customerService.UpdateAsync(id, request);
 
         if (!updated)
             return NotFound();
@@ -87,20 +105,34 @@ public class CustomersController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>
-    /// Deletes an existing customer.
-    /// </summary>
     [HttpDelete("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var deleted =
-            await _customerService.DeleteAsync(id);
+        if (User.IsInRole("Customer"))
+        {
+            if (!IsCurrentUser(id))
+                return Forbid();
+        }
+        else if (!await _branchAuthorization.CanAccessCustomerAsync(id))
+        {
+            return Forbid();
+        }
+
+        var deleted = await _customerService.DeleteAsync(id);
 
         if (!deleted)
             return NotFound();
 
         return NoContent();
+    }
+
+    private bool IsCurrentUser(Guid customerId)
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue("sub");
+
+        return Guid.TryParse(claim, out var userId) &&
+               userId == customerId;
     }
 }

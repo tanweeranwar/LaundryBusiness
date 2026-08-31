@@ -1,4 +1,4 @@
-﻿using Laundry.API.DTOs.Pickup;
+using Laundry.API.DTOs.Pickup;
 using Laundry.API.Enums;
 using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -12,17 +12,23 @@ namespace Laundry.API.Controllers;
 public class PickupsController : ControllerBase
 {
     private readonly IPickupService _pickupService;
+    private readonly IBranchAuthorizationService _branchAuthorization;
 
-    public PickupsController(IPickupService pickupService)
+    public PickupsController(
+        IPickupService pickupService,
+        IBranchAuthorizationService branchAuthorization)
     {
         _pickupService = pickupService;
+        _branchAuthorization = branchAuthorization;
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(PickupDto), StatusCodes.Status201Created)]
-    public async Task<ActionResult<PickupDto>> Create(
-        CreatePickupDto request)
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
+    public async Task<ActionResult<PickupDto>> Create(CreatePickupDto request)
     {
+        if (!await _branchAuthorization.CanAccessOrderAsync(request.OrderId))
+            return Forbid();
+
         var pickup = await _pickupService.CreateAsync(request);
 
         return CreatedAtAction(
@@ -32,8 +38,6 @@ public class PickupsController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(PickupDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PickupDto>> GetById(int id)
     {
         var pickup = await _pickupService.GetByIdAsync(id);
@@ -41,14 +45,18 @@ public class PickupsController : ControllerBase
         if (pickup == null)
             return NotFound();
 
+        if (!await _branchAuthorization.CanAccessPickupAsync(id))
+            return Forbid();
+
         return Ok(pickup);
     }
 
     [HttpGet("order/{orderId:int}")]
-    [ProducesResponseType(typeof(PickupDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PickupDto>> GetByOrderId(int orderId)
     {
+        if (!await _branchAuthorization.CanAccessOrderAsync(orderId))
+            return Forbid();
+
         var pickup = await _pickupService.GetByOrderIdAsync(orderId);
 
         if (pickup == null)
@@ -58,26 +66,36 @@ public class PickupsController : ControllerBase
     }
 
     [HttpGet("status/{status}")]
-    [ProducesResponseType(typeof(IEnumerable<PickupDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<PickupDto>>> GetByStatus(
-        PickupStatus status)
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee,Delivery Agent")]
+    public async Task<ActionResult<IEnumerable<PickupDto>>> GetByStatus(PickupStatus status)
     {
         var pickups = await _pickupService.GetByStatusAsync(status);
 
-        return Ok(pickups);
+        if (_branchAuthorization.IsSuperAdmin)
+            return Ok(pickups);
+
+        var scoped = new List<PickupDto>();
+        foreach (var pickup in pickups)
+        {
+            if (await _branchAuthorization.CanAccessOrderAsync(pickup.OrderId))
+                scoped.Add(pickup);
+        }
+
+        return Ok(scoped);
     }
 
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(PickupDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee,Delivery Agent")]
     public async Task<ActionResult<PickupDto>> Update(
         int id,
         UpdatePickupDto request)
     {
+        if (!await _branchAuthorization.CanAccessPickupAsync(id))
+            return Forbid();
+
         try
         {
             var pickup = await _pickupService.UpdateAsync(id, request);
-
             return Ok(pickup);
         }
         catch (KeyNotFoundException)

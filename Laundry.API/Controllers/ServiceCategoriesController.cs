@@ -1,4 +1,4 @@
-﻿using Laundry.API.DTOs.ServiceCategory;
+using Laundry.API.DTOs.ServiceCategory;
 using Laundry.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,9 +19,7 @@ public class ServiceCategoriesController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ServiceCategoryResponse>>> GetAll()
-    {
-        return Ok(await _service.GetAllAsync());
-    }
+        => Ok(await _service.GetAllAsync());
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ServiceCategoryResponse>> GetById(int id)
@@ -35,6 +33,7 @@ public class ServiceCategoriesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Super Admin")]
     public async Task<ActionResult<ServiceCategoryResponse>> Create(CreateServiceCategoryRequest request)
     {
         var result = await _service.CreateAsync(request);
@@ -45,6 +44,7 @@ public class ServiceCategoriesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Super Admin")]
     public async Task<IActionResult> Update(
         int id,
         CreateServiceCategoryRequest request)
@@ -58,6 +58,7 @@ public class ServiceCategoriesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Super Admin")]
     public async Task<IActionResult> Delete(int id)
     {
         var deleted = await _service.DeleteAsync(id);

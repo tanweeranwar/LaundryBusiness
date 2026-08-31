@@ -1,5 +1,4 @@
-﻿using Laundry.API.DTOs.GarmentType;
-using Laundry.API.Services;
+using Laundry.API.DTOs.GarmentType;
 using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,9 +19,7 @@ public class GarmentTypesController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<GarmentTypeResponse>>> GetAll()
-    {
-        return Ok(await _service.GetAllAsync());
-    }
+        => Ok(await _service.GetAllAsync());
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<GarmentTypeResponse>> GetById(int id)
@@ -36,6 +33,7 @@ public class GarmentTypesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Super Admin")]
     public async Task<ActionResult<GarmentTypeResponse>> Create(CreateGarmentTypeRequest request)
     {
         var garmentType = await _service.CreateAsync(request);
@@ -47,6 +45,7 @@ public class GarmentTypesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Super Admin")]
     public async Task<IActionResult> Update(
         int id,
         CreateGarmentTypeRequest request)
@@ -60,6 +59,7 @@ public class GarmentTypesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Super Admin")]
     public async Task<IActionResult> Delete(int id)
     {
         var deleted = await _service.DeleteAsync(id);

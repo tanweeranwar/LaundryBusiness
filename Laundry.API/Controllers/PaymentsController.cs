@@ -1,4 +1,4 @@
-﻿using Laundry.API.DTOs.Payment;
+using Laundry.API.DTOs.Payment;
 using Laundry.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,20 +11,23 @@ namespace Laundry.API.Controllers;
 public class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
+    private readonly IBranchAuthorizationService _branchAuthorization;
 
-    public PaymentsController(IPaymentService paymentService)
+    public PaymentsController(
+        IPaymentService paymentService,
+        IBranchAuthorizationService branchAuthorization)
     {
         _paymentService = paymentService;
+        _branchAuthorization = branchAuthorization;
     }
 
-    /// <summary>
-    /// Records a payment against an order.
-    /// </summary>
     [HttpPost]
-    [ProducesResponseType(typeof(PaymentDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<PaymentDto>> Create(CreatePaymentDto request)
     {
+        if (!await _branchAuthorization.CanAccessOrderAsync(request.OrderId))
+            return Forbid();
+
         var payment = await _paymentService.CreateAsync(request);
 
         return CreatedAtAction(
@@ -33,12 +36,8 @@ public class PaymentsController : ControllerBase
             payment);
     }
 
-    /// <summary>
-    /// Gets a payment by Id.
-    /// </summary>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(PaymentDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<PaymentDto>> GetById(int id)
     {
         var payment = await _paymentService.GetByIdAsync(id);
@@ -46,33 +45,33 @@ public class PaymentsController : ControllerBase
         if (payment == null)
             return NotFound();
 
+        if (!await _branchAuthorization.CanAccessPaymentAsync(id))
+            return Forbid();
+
         return Ok(payment);
     }
 
-    /// <summary>
-    /// Gets all payments for an order.
-    /// </summary>
     [HttpGet("order/{orderId:int}")]
-    [ProducesResponseType(typeof(IEnumerable<PaymentDto>), StatusCodes.Status200OK)]
+    [Authorize(Roles = "Customer,Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<IEnumerable<PaymentDto>>> GetByOrder(int orderId)
     {
-        var payments = await _paymentService.GetByOrderIdAsync(orderId);
+        if (!await _branchAuthorization.CanAccessOrderAsync(orderId))
+            return Forbid();
 
+        var payments = await _paymentService.GetByOrderIdAsync(orderId);
         return Ok(payments);
     }
 
-    /// <summary>
-    /// Updates payment details.
-    /// </summary>
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(PaymentDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Super Admin,Branch Admin,Employee")]
     public async Task<ActionResult<PaymentDto>> Update(
         int id,
         UpdatePaymentDto request)
     {
-        var payment = await _paymentService.UpdateAsync(id, request);
+        if (!await _branchAuthorization.CanAccessPaymentAsync(id))
+            return Forbid();
 
+        var payment = await _paymentService.UpdateAsync(id, request);
         return Ok(payment);
     }
 }
